@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package acme.inventory.v1;
+
+import "acme/common/v1/common.proto";
+
+service InventoryService {
+  rpc GetStock(GetStockRequest) returns (GetStockResponse);
+  rpc ReserveStock(ReserveStockRequest) returns (ReserveStockResponse);
+}
+
+message WarehouseRef {
+  string warehouse_id = 1;
+  string region = 2;
+}
+
+message StockItem {
+  string sku = 1;
+  int32 available = 2;
+  int32 reserved = 3;
+  WarehouseRef warehouse = 4;
+  map<string, string> attributes = 5;
+}
+
+message GetStockRequest {
+  repeated string skus = 1;
+  string region = 2;
+  acme.common.v1.RequestContext context = 3;
+  acme.common.v1.Actor actor = 4;
+  map<string, string> headers = 5;
+}
+
+message GetStockResponse {
+  repeated StockItem items = 1;
+  acme.common.v1.RequestContext context = 2;
+}
+
+message ReservationLine {
+  string sku = 1;
+  int32 quantity = 2;
+  map<string, string> attributes = 3;
+}
+
+message ReserveStockRequest {
+  string reservation_id = 1;
+  repeated ReservationLine lines = 2;
+  string region = 3;
+  acme.common.v1.RequestContext context = 4;
+  acme.common.v1.Actor actor = 5;
+  map<string, string> headers = 6;
+}
+
+message ReserveStockResponse {
+  string reservation_id = 1;
+  repeated StockItem reserved_items = 2;
+  acme.common.v1.RequestContext context = 3;
+}
+

@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package acme.payment.v1;
+
+import "acme/common/v1/common.proto";
+
+service PaymentService {
+  rpc Authorize(AuthorizePaymentRequest) returns (AuthorizePaymentResponse);
+  rpc Capture(CapturePaymentRequest) returns (CapturePaymentResponse);
+}
+
+message CardDetails {
+  string pan_last4 = 1;
+  string brand = 2;
+  int32 exp_month = 3;
+  int32 exp_year = 4;
+}
+
+message PaymentMethod {
+  string method_id = 1;
+  string type = 2;
+  CardDetails card = 3;
+  map<string, string> attributes = 4;
+}
+
+message AuthorizePaymentRequest {
+  string payment_id = 1;
+  string order_id = 2;
+  string user_id = 3;
+  acme.common.v1.Money amount = 4;
+  PaymentMethod method = 5;
+  acme.common.v1.RequestContext context = 6;
+  acme.common.v1.Actor actor = 7;
+  map<string, string> headers = 8;
+}
+
+message AuthorizePaymentResponse {
+  string payment_id = 1;
+  string status = 2;
+  string auth_code = 3;
+  map<string, string> metadata = 4;
+  acme.common.v1.RequestContext context = 5;
+}
+
+message CapturePaymentRequest {
+  string payment_id = 1;
+  acme.common.v1.Money amount = 2;
+  acme.common.v1.RequestContext context = 3;
+  map<string, string> headers = 4;
+}
+
+message CapturePaymentResponse {
+  string payment_id = 1;
+  string status = 2;
+  string capture_id = 3;
+  map<string, string> metadata = 4;
+  acme.common.v1.RequestContext context = 5;
+}
+

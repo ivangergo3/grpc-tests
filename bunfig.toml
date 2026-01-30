@@ -1,0 +1,4 @@
+# Optional Bun config. Keeping this minimal on purpose.
+#
+# You don't need `bun init` to use this repo: `bun install` is enough.
+# But you *can* run `bun init` in an empty folder to generate a starter `package.json`.

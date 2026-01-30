@@ -1,0 +1,106 @@
+pipeline {
+  agent {
+    docker {
+      image "oven/bun:1"
+      args "-u root:root"
+    }
+  }
+
+  options {
+    timestamps()
+    ansiColor("xterm")
+    timeout(time: 15, unit: "MINUTES")
+  }
+
+  parameters {
+    choice(
+      name: "TEST_ENV",
+      choices: ["local", "dev"],
+      description: "Select environment from grpc-tests/src/utils/environments.ts"
+    )
+    string(name: "THREAD_COUNT", defaultValue: "2", description: "How many parallel threads to run (default: 2)")
+  }
+
+  environment {
+    TEST_ENV = "${params.TEST_ENV}"
+    THREAD_COUNT = "${params.THREAD_COUNT}"
+    CI = "true"
+  }
+
+  stages {
+    stage("Tooling (Java for Allure)") {
+      steps {
+        sh """
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends default-jre ca-certificates
+          java -version
+          bun --version
+        """
+      }
+    }
+
+    stage("Install") {
+      steps {
+        dir("grpc-tests") {
+          sh """
+            set -euo pipefail
+            bun install
+          """
+        }
+      }
+    }
+
+    stage("Test (smoke, sharded)") {
+      steps {
+        script {
+          def shardCount = Integer.parseInt(params.THREAD_COUNT ?: "2")
+          if (shardCount < 1) {
+            error("THREAD_COUNT must be >= 1 (got: ${params.THREAD_COUNT})")
+          }
+
+          def branches = [:]
+          for (int i = 1; i <= shardCount; i++) {
+            def shardIndex = i
+            branches["Smoke ${shardIndex}/${shardCount}"] = {
+              dir("grpc-tests") {
+                sh """
+                  set -euo pipefail
+                  mkdir -p test-results allure-results/shard-${shardIndex}
+                  ALLURE_RESULTS_DIR=allure-results/shard-${shardIndex} \\
+                  JUNIT_OUTPUT_FILE=test-results/junit-shard-${shardIndex}.xml \\
+                  bun run test -- --shard=${shardIndex}/${shardCount} src/tests/user-service.remote.test.ts
+                """
+              }
+            }
+          }
+
+          parallel branches
+        }
+      }
+    }
+
+    stage("Allure (merge + generate HTML)") {
+      steps {
+        dir("grpc-tests") {
+          sh """
+            set -euo pipefail
+            dirs=""
+            for i in \$(seq 1 "${THREAD_COUNT}"); do
+              dirs="\$dirs allure-results/shard-\$i"
+            done
+            bunx allure generate --clean \$dirs -o allure-report
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      junit allowEmptyResults: true, testResults: "grpc-tests/test-results/junit*.xml"
+      archiveArtifacts artifacts: "grpc-tests/allure-results/**, grpc-tests/allure-report/**", allowEmptyArchive: true
+    }
+  }
+}
+

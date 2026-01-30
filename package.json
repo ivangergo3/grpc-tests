@@ -1,0 +1,44 @@
+{
+  "name": "grpc-tests",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "gen": "bash ./scripts/gen-protos.sh",
+    "gen:ps": "powershell -ExecutionPolicy Bypass -File ./scripts/gen-protos.ps1",
+    "jenkins:up": "docker compose -f ./jenkins/local/compose.yml up -d --build",
+    "jenkins:down": "docker compose -f ./jenkins/local/compose.yml down",
+    "jenkins:restart": "docker compose -f ./jenkins/local/compose.yml restart",
+    "jenkins:logs": "docker compose -f ./jenkins/local/compose.yml logs -f --tail=200",
+    "jenkins:password": "docker exec -it grpc-tests-jenkins cat /var/jenkins_home/secrets/initialAdminPassword",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "test": "vitest run",
+    "allure:serve": "bunx allure serve allure-results",
+    "allure:generate": "bunx allure generate --clean allure-results -o allure-report",
+    "allure:open": "bunx allure open allure-report",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.0",
+    "protobufjs": "^7.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/node": "^22.10.0",
+    "@vitest/runner": "^4",
+    "allure-commandline": "^2.34.0",
+    "allure-vitest": "^3.0.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "grpc-tools": "^1.13.0",
+    "prettier": "^3.8.1",
+    "ts-proto": "^2.7.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.53.1",
+    "vitest": "^4"
+  }
+}
