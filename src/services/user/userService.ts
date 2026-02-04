@@ -6,7 +6,13 @@ import type {
   SearchUsersResponse
 } from "@gen/acme/user/v1/user_service";
 import { UserServiceClient } from "@gen/acme/user/v1/user_service";
-import { BaseGrpcService, type unary_call_options } from "@services/base";
+import { BaseGrpcService, type unary_call_options } from "@services/baseService";
+import {
+  buildGetUserRequest,
+  buildSearchUsersRequest,
+  type GetUserParams,
+  type SearchUsersParams
+} from "./userRequest";
 
 export class UserServiceApi extends BaseGrpcService<UserServiceClient> {
   constructor(target: string, creds: grpc.ChannelCredentials, options?: grpc.ClientOptions) {
@@ -32,5 +38,21 @@ export class UserServiceApi extends BaseGrpcService<UserServiceClient> {
       if (callOpts) return this.client.searchUsers(req, metadata, callOpts, cb);
       return this.client.searchUsers(req, metadata, cb);
     });
+  }
+
+  /** Build request from params (base + child), send, return raw response (5.1). */
+  getUserWithParams(
+    params: GetUserParams,
+    opts: unary_call_options = {}
+  ): Promise<GetUserResponse> {
+    return this.getUser(buildGetUserRequest(params), opts);
+  }
+
+  /** Build request from params (base + child), send, return raw response (5.1). */
+  searchUsersWithParams(
+    params: SearchUsersParams,
+    opts: unary_call_options = {}
+  ): Promise<SearchUsersResponse> {
+    return this.searchUsers(buildSearchUsersRequest(params), opts);
   }
 }

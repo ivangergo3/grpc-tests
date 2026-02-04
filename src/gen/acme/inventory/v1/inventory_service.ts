@@ -58,6 +58,11 @@ export interface GetStockResponse {
   context?: RequestContext | undefined;
 }
 
+/** One message containing N logical responses (for multi-response / aggregated testing). */
+export interface GetStockAggregatedResponse {
+  responses: GetStockResponse[];
+}
+
 export interface ReservationLine {
   sku: string;
   quantity: number;
@@ -701,6 +706,68 @@ export const GetStockResponse: MessageFns<GetStockResponse> = {
   },
 };
 
+function createBaseGetStockAggregatedResponse(): GetStockAggregatedResponse {
+  return { responses: [] };
+}
+
+export const GetStockAggregatedResponse: MessageFns<GetStockAggregatedResponse> = {
+  encode(message: GetStockAggregatedResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.responses) {
+      GetStockResponse.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetStockAggregatedResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetStockAggregatedResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.responses.push(GetStockResponse.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetStockAggregatedResponse {
+    return {
+      responses: globalThis.Array.isArray(object?.responses)
+        ? object.responses.map((e: any) => GetStockResponse.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: GetStockAggregatedResponse): unknown {
+    const obj: any = {};
+    if (message.responses?.length) {
+      obj.responses = message.responses.map((e) => GetStockResponse.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetStockAggregatedResponse>, I>>(base?: I): GetStockAggregatedResponse {
+    return GetStockAggregatedResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetStockAggregatedResponse>, I>>(object: I): GetStockAggregatedResponse {
+    const message = createBaseGetStockAggregatedResponse();
+    message.responses = object.responses?.map((e) => GetStockResponse.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 function createBaseReservationLine(): ReservationLine {
   return { sku: "", quantity: 0, attributes: {} };
 }
@@ -1260,6 +1327,17 @@ export const InventoryServiceService = {
     responseSerialize: (value: GetStockResponse): Buffer => Buffer.from(GetStockResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): GetStockResponse => GetStockResponse.decode(value),
   },
+  /** Aggregated: returns one message with N GetStockResponse entries (1–3) based on SYSTEM_B_ENABLED / SYSTEM_C_ENABLED. */
+  getStockAggregated: {
+    path: "/acme.inventory.v1.InventoryService/GetStockAggregated",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetStockRequest): Buffer => Buffer.from(GetStockRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetStockRequest => GetStockRequest.decode(value),
+    responseSerialize: (value: GetStockAggregatedResponse): Buffer =>
+      Buffer.from(GetStockAggregatedResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetStockAggregatedResponse => GetStockAggregatedResponse.decode(value),
+  },
   reserveStock: {
     path: "/acme.inventory.v1.InventoryService/ReserveStock",
     requestStream: false,
@@ -1274,6 +1352,8 @@ export const InventoryServiceService = {
 
 export interface InventoryServiceServer extends UntypedServiceImplementation {
   getStock: handleUnaryCall<GetStockRequest, GetStockResponse>;
+  /** Aggregated: returns one message with N GetStockResponse entries (1–3) based on SYSTEM_B_ENABLED / SYSTEM_C_ENABLED. */
+  getStockAggregated: handleUnaryCall<GetStockRequest, GetStockAggregatedResponse>;
   reserveStock: handleUnaryCall<ReserveStockRequest, ReserveStockResponse>;
 }
 
@@ -1292,6 +1372,22 @@ export interface InventoryServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: GetStockResponse) => void,
+  ): ClientUnaryCall;
+  /** Aggregated: returns one message with N GetStockResponse entries (1–3) based on SYSTEM_B_ENABLED / SYSTEM_C_ENABLED. */
+  getStockAggregated(
+    request: GetStockRequest,
+    callback: (error: ServiceError | null, response: GetStockAggregatedResponse) => void,
+  ): ClientUnaryCall;
+  getStockAggregated(
+    request: GetStockRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetStockAggregatedResponse) => void,
+  ): ClientUnaryCall;
+  getStockAggregated(
+    request: GetStockRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetStockAggregatedResponse) => void,
   ): ClientUnaryCall;
   reserveStock(
     request: ReserveStockRequest,

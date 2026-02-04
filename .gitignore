@@ -5,4 +5,5 @@ test-results/
 allure-results/
 allure-report/
 .DS_Store
+.env
 /jenkins/local

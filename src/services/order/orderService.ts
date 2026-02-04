@@ -8,7 +8,15 @@ import type {
   ListOrdersResponse
 } from "@gen/acme/order/v1/order_service";
 import { OrderServiceClient } from "@gen/acme/order/v1/order_service";
-import { BaseGrpcService, type unary_call_options } from "@services/base";
+import { BaseGrpcService, type unary_call_options } from "@services/baseService";
+import {
+  buildCreateOrderRequest,
+  buildGetOrderRequest,
+  buildListOrdersRequest,
+  type CreateOrderParams,
+  type GetOrderParams,
+  type ListOrdersParams
+} from "./orderRequest";
 
 export class OrderServiceApi extends BaseGrpcService<OrderServiceClient> {
   constructor(target: string, creds: grpc.ChannelCredentials, options?: grpc.ClientOptions) {
@@ -43,5 +51,29 @@ export class OrderServiceApi extends BaseGrpcService<OrderServiceClient> {
       if (callOpts) return this.client.listOrders(req, metadata, callOpts, cb);
       return this.client.listOrders(req, metadata, cb);
     });
+  }
+
+  /** Build request from params (base + child), send, return raw response (5.1). */
+  createOrderWithParams(
+    params: CreateOrderParams,
+    opts: unary_call_options = {}
+  ): Promise<CreateOrderResponse> {
+    return this.createOrder(buildCreateOrderRequest(params), opts);
+  }
+
+  /** Build request from params (base + child), send, return raw response (5.1). */
+  getOrderWithParams(
+    params: GetOrderParams,
+    opts: unary_call_options = {}
+  ): Promise<GetOrderResponse> {
+    return this.getOrder(buildGetOrderRequest(params), opts);
+  }
+
+  /** Build request from params (base + child), send, return raw response (5.1). */
+  listOrdersWithParams(
+    params: ListOrdersParams,
+    opts: unary_call_options = {}
+  ): Promise<ListOrdersResponse> {
+    return this.listOrders(buildListOrdersRequest(params), opts);
   }
 }

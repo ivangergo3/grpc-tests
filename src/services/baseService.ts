@@ -1,5 +1,6 @@
 import * as grpc from "@grpc/grpc-js";
 import { getEnvironment } from "@utils/environments";
+import { getErrorCodeInfo } from "@utils/grpc/errorCodes";
 import { ContentType, attachment } from "allure-js-commons";
 
 export type unary_call_options = {
@@ -55,10 +56,13 @@ const metadataToObject = (m: grpc.Metadata | undefined): Record<string, string> 
 const toGrpcErrorSummary = (err: unknown): Record<string, unknown> => {
   if (!(err instanceof Error)) return { message: String(err) };
   const e = err as grpc.ServiceError;
+  const codeInfo = getErrorCodeInfo(e.code);
   return {
     name: e.name,
     message: e.message,
     code: e.code,
+    codeName: codeInfo.name,
+    codeDescription: codeInfo.description,
     details: e.details,
     metadata: metadataToObject(e.metadata)
   };
@@ -117,25 +121,18 @@ export abstract class BaseGrpcService<TClient> {
 
   /**
    * Default unary deadline used when callers don't provide `deadlineMs`.
-   *
-   * Override in subclasses if specific services need longer timeouts.
-   * Configure globally via `GRPC_DEFAULT_DEADLINE_MS` (or `GRPC_DEADLINE_MS`).
    */
   protected defaultDeadlineMs(): number {
-    // Optional override via env vars (handy for quick CI tuning),
-    // otherwise use the selected environment config.
     const raw = process.env.GRPC_DEFAULT_DEADLINE_MS ?? process.env.GRPC_DEADLINE_MS;
     if (raw) {
       const n = Number(raw);
       if (Number.isFinite(n) && n > 0) return n;
     }
-
     const fromConfig = getEnvironment().timeouts.grpcDefaultDeadlineMs;
     return fromConfig > 0 ? fromConfig : 5_000;
   }
 
   protected callOptions(opts: unary_call_options): grpc.CallOptions | undefined {
-    // Allow explicitly disabling deadlines for a call by passing `deadlineMs: 0`.
     const ms = opts.deadlineMs ?? this.defaultDeadlineMs();
     if (!ms || ms <= 0) return undefined;
     return { deadline: this.deadlineFromNowMs(ms) };
@@ -158,6 +155,69 @@ export abstract class BaseGrpcService<TClient> {
         if (err) return reject(err);
         if (!res) return reject(new Error("missing response"));
         resolve(res);
+      });
+    });
+  }
+
+  /**
+   * Collects server-streaming responses into an array and optionally attaches to Allure.
+   */
+  protected streamCallWithReport<TReq, TRes>(
+    ctx: { rpc: string; request: TReq; metadata?: grpc.Metadata; deadlineMs?: number },
+    opts: unary_call_options,
+    getStream: () => {
+      on(event: "data", listener: (chunk: TRes) => void): unknown;
+      on(event: "end", listener: () => void): unknown;
+      on(event: "error", listener: (err: Error) => void): unknown;
+    }
+  ): Promise<TRes[]> {
+    const ro = this.reportOpts(opts);
+    const responses: TRes[] = [];
+
+    return new Promise<TRes[]>((resolve, reject) => {
+      const stream = getStream();
+
+      stream.on("data", (chunk: TRes) => {
+        responses.push(chunk);
+      });
+
+      stream.on("end", async () => {
+        if (ro.attachOnSuccess) {
+          await tryAllureAttachment(
+            `gRPC ${ctx.rpc} (stream success)`,
+            {
+              rpc: ctx.rpc,
+              target: this.target,
+              deadlineMs: ctx.deadlineMs,
+              request: ctx.request,
+              responses,
+              responseCount: responses.length,
+              requestMetadata: metadataToObject(ctx.metadata)
+            },
+            `grpc-${ctx.rpc.replaceAll("/", "_").replaceAll(".", "_")}-stream-success`
+          );
+        }
+        resolve(responses);
+      });
+
+      stream.on("error", async (err: Error) => {
+        if (ro.attachOnError) {
+          await tryAllureAttachment(
+            `gRPC ${ctx.rpc} (stream error)`,
+            {
+              rpc: ctx.rpc,
+              target: this.target,
+              deadlineMs: ctx.deadlineMs,
+              request: ctx.request,
+              responsesCollected: responses,
+              responseCount: responses.length,
+              requestMetadata: metadataToObject(ctx.metadata),
+              error: toGrpcErrorSummary(err)
+            },
+            `grpc-${ctx.rpc.replaceAll("/", "_").replaceAll(".", "_")}-stream-error`
+          );
+        }
+        reject(err);
       });
     });
   }

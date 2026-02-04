@@ -7,7 +7,13 @@ import type {
   TrackShipmentResponse
 } from "@gen/acme/shipping/v1/shipping_service";
 import { ShippingServiceClient } from "@gen/acme/shipping/v1/shipping_service";
-import { BaseGrpcService, type unary_call_options } from "@services/base";
+import { BaseGrpcService, type unary_call_options } from "@services/baseService";
+import {
+  buildCreateShipmentRequest,
+  buildTrackShipmentRequest,
+  type CreateShipmentParams,
+  type TrackShipmentParams
+} from "./shippingRequest";
 
 export class ShippingServiceApi extends BaseGrpcService<ShippingServiceClient> {
   constructor(target: string, creds: grpc.ChannelCredentials, options?: grpc.ClientOptions) {
@@ -21,7 +27,10 @@ export class ShippingServiceApi extends BaseGrpcService<ShippingServiceClient> {
     const metadata = this.metadata(opts);
     const callOpts = this.callOptions(opts);
     const deadlineMs = opts.deadlineMs ?? this.defaultDeadlineMs();
-    return this.unaryCallWithReport<CreateShipmentRequest, CreateShipmentResponse>(
+    const result: Promise<CreateShipmentResponse> = this.unaryCallWithReport<
+      CreateShipmentRequest,
+      CreateShipmentResponse
+    >(
       {
         rpc: "ShippingService.CreateShipment",
         request: req,
@@ -34,6 +43,7 @@ export class ShippingServiceApi extends BaseGrpcService<ShippingServiceClient> {
         return this.client.createShipment(req, metadata, cb);
       }
     );
+    return result;
   }
 
   trackShipment(
@@ -43,7 +53,10 @@ export class ShippingServiceApi extends BaseGrpcService<ShippingServiceClient> {
     const metadata = this.metadata(opts);
     const callOpts = this.callOptions(opts);
     const deadlineMs = opts.deadlineMs ?? this.defaultDeadlineMs();
-    return this.unaryCallWithReport<TrackShipmentRequest, TrackShipmentResponse>(
+    const result: Promise<TrackShipmentResponse> = this.unaryCallWithReport<
+      TrackShipmentRequest,
+      TrackShipmentResponse
+    >(
       {
         rpc: "ShippingService.TrackShipment",
         request: req,
@@ -56,5 +69,22 @@ export class ShippingServiceApi extends BaseGrpcService<ShippingServiceClient> {
         return this.client.trackShipment(req, metadata, cb);
       }
     );
+    return result;
+  }
+
+  /** Build request from params (base + child), send, return raw response (5.1). */
+  createShipmentWithParams(
+    params: CreateShipmentParams,
+    opts: unary_call_options = {}
+  ): Promise<CreateShipmentResponse> {
+    return this.createShipment(buildCreateShipmentRequest(params), opts);
+  }
+
+  /** Build request from params (base + child), send, return raw response (5.1). */
+  trackShipmentWithParams(
+    params: TrackShipmentParams,
+    opts: unary_call_options = {}
+  ): Promise<TrackShipmentResponse> {
+    return this.trackShipment(buildTrackShipmentRequest(params), opts);
   }
 }

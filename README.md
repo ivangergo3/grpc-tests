@@ -211,6 +211,36 @@ Configured per environment:
 - **Whole run watchdog**: `timeouts.runTimeoutMs`
   - Implemented in `src/utils/test/vitest.setup.ts` (hard-fails if the run hangs too long).
 
+### System flags (multi-response RPCs)
+
+Some RPCs return **multiple responses** (1–3) depending on which backend “systems” are enabled. This is controlled by env vars; the same test can run with 1, 2, or 3 responses without code changes.
+
+- **System A**: always on (one response minimum).
+- **System B**: on when `SYSTEM_B_ENABLED=true` or `SYSTEM_B_ENABLED=1`.
+- **System C**: on when `SYSTEM_C_ENABLED=true` or `SYSTEM_C_ENABLED=1`.
+
+**Expected response count**: 1 (A only), 2 (A+B), or 3 (A+B+C). The client and stub servers both read these from `src/utils/environments.ts` via `getExpectedResponseCount()` (and `getExpectedResponseCountForRpc(rpc)` in the request layer). Multi-response RPCs in this harness:
+
+- **Notification**: `SendEmailStream` (server-streaming).
+- **Inventory**: `GetStockAggregated` (single message with N sub-responses).
+
+To run with 2 or 3 responses, set the env vars **before** starting the test run (and ensure stub servers are started with the same env):
+
+```bash
+SYSTEM_B_ENABLED=1 bun run test
+SYSTEM_B_ENABLED=1 SYSTEM_C_ENABLED=1 bun run test
+```
+
+### Testing with N systems
+
+| Scenario   | Env vars                          | Expected response count |
+| ---------- | --------------------------------- | ------------------------ |
+| Local      | (none)                            | 1 (System A only)       |
+| Dev + B    | `SYSTEM_B_ENABLED=1`              | 2 (A + B)                |
+| Full       | `SYSTEM_B_ENABLED=1 SYSTEM_C_ENABLED=1` | 3 (A + B + C)     |
+
+Use these when you want to validate multi-response behavior (e.g. `SendEmailStream`, `GetStockAggregated`) with 2 or 3 responses. Tests that use `getExpectedResponseCountForRpc()` or `sendAndVerify` will assert the correct N for the current env.
+
 ### Retries (Vitest)
 
 Global retries are controlled in `vitest.config.ts`:
@@ -316,7 +346,30 @@ They wrap generated `ts-proto` clients and provide:
 
 Base class:
 
-- `src/services/base.ts` (`BaseGrpcService`)
+- `src/services/baseService.ts` (`BaseGrpcService`)
+
+---
+
+## Request/Response model
+
+Tests avoid raw request/response handling by using a **request layer** and a **verification layer**.
+
+### Request layer
+
+- **Base request** (`src/services/baseRequest.ts`): common fields (context, actor, headers) and `defaultBaseRequestFields()`.
+- **Child requests** (`src/services/<domain>/<domain>Request.ts`): per-service params (e.g. `SendEmailParams`, `GetStockParams`) that extend base fields. Request builders (e.g. `buildSendEmailRequest`, `buildGetStockRequest`) produce the gRPC request from params.
+- **Multi-response RPCs** are tagged in `baseRequest.ts` (`MULTI_RESPONSE_RPCS`, `getExpectedResponseCountForRpc(rpc)`). Expected response count (1–3) comes from env + request type.
+
+### Verification layer
+
+- **Base verifiers** (`src/services/baseSuccess.ts`, `baseFailure.ts`): `verifySuccessContext`, `verifyResponseCount`, `verifyFailure`. Verifiers accept **one or many** responses (unary, streaming, or aggregated).
+- **Child verifiers** (`src/services/<domain>/<domain>Success.ts`, `<domain>Failure.ts`): e.g. `verifySendEmailSuccess`, `verifyGetStockSuccess`. They take optional `expectedCount` (from `getExpectedResponseCountForRpc`) to assert “exactly N responses” for multi-response RPCs.
+
+### Multi-response (streaming vs aggregated)
+
+- **Streaming**: RPC returns a stream of messages (e.g. `SendEmailStream`). The service layer collects them and returns `TRes[]`.
+- **Aggregated**: RPC returns one message containing N sub-responses (e.g. `GetStockAggregated`). The service layer returns the inner array as `TRes[]`.
+- Tests use the same verifiers for both; they never branch on “streaming vs aggregated” or “how many responses.” Use `*WithParams` methods and verifiers, or `*SendAndVerify` helpers for multi-response RPCs.
 
 ---
 

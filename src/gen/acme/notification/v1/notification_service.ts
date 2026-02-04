@@ -11,7 +11,9 @@ import {
   type ChannelCredentials,
   Client,
   type ClientOptions,
+  type ClientReadableStream,
   type ClientUnaryCall,
+  type handleServerStreamingCall,
   type handleUnaryCall,
   makeGenericClientConstructor,
   type Metadata,
@@ -1162,6 +1164,16 @@ export const NotificationServiceService = {
     responseSerialize: (value: SendEmailResponse): Buffer => Buffer.from(SendEmailResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): SendEmailResponse => SendEmailResponse.decode(value),
   },
+  /** Server-streaming: returns N responses (1–3) based on SYSTEM_B_ENABLED / SYSTEM_C_ENABLED. */
+  sendEmailStream: {
+    path: "/acme.notification.v1.NotificationService/SendEmailStream",
+    requestStream: false,
+    responseStream: true,
+    requestSerialize: (value: SendEmailRequest): Buffer => Buffer.from(SendEmailRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SendEmailRequest => SendEmailRequest.decode(value),
+    responseSerialize: (value: SendEmailResponse): Buffer => Buffer.from(SendEmailResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): SendEmailResponse => SendEmailResponse.decode(value),
+  },
   sendSms: {
     path: "/acme.notification.v1.NotificationService/SendSms",
     requestStream: false,
@@ -1175,6 +1187,8 @@ export const NotificationServiceService = {
 
 export interface NotificationServiceServer extends UntypedServiceImplementation {
   sendEmail: handleUnaryCall<SendEmailRequest, SendEmailResponse>;
+  /** Server-streaming: returns N responses (1–3) based on SYSTEM_B_ENABLED / SYSTEM_C_ENABLED. */
+  sendEmailStream: handleServerStreamingCall<SendEmailRequest, SendEmailResponse>;
   sendSms: handleUnaryCall<SendSmsRequest, SendSmsResponse>;
 }
 
@@ -1194,6 +1208,13 @@ export interface NotificationServiceClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: SendEmailResponse) => void,
   ): ClientUnaryCall;
+  /** Server-streaming: returns N responses (1–3) based on SYSTEM_B_ENABLED / SYSTEM_C_ENABLED. */
+  sendEmailStream(request: SendEmailRequest, options?: Partial<CallOptions>): ClientReadableStream<SendEmailResponse>;
+  sendEmailStream(
+    request: SendEmailRequest,
+    metadata?: Metadata,
+    options?: Partial<CallOptions>,
+  ): ClientReadableStream<SendEmailResponse>;
   sendSms(
     request: SendSmsRequest,
     callback: (error: ServiceError | null, response: SendSmsResponse) => void,

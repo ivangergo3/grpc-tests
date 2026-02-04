@@ -1,4 +1,5 @@
 import * as grpc from "@grpc/grpc-js";
+import { getExpectedResponseCount } from "@utils/environments";
 
 import {
   AuditServiceService,
@@ -9,6 +10,7 @@ import {
 } from "@gen/acme/audit/v1/audit_service";
 import {
   InventoryServiceService,
+  type GetStockAggregatedResponse,
   type GetStockRequest,
   type GetStockResponse,
   type ReserveStockRequest,
@@ -51,7 +53,7 @@ import {
   type SearchUsersRequest,
   type SearchUsersResponse
 } from "@gen/acme/user/v1/user_service";
-import { UserServiceApi } from "@services/user";
+import { UserServiceApi } from "@services/user/userService";
 
 export type started_server = {
   address: string;
@@ -279,6 +281,27 @@ export const startInventoryServiceServer = async (): Promise<started_server> => 
         reservedItems: items,
         context: call.request.context
       });
+    },
+    getStockAggregated(
+      call: grpc.ServerUnaryCall<GetStockRequest, GetStockAggregatedResponse>,
+      callback: grpc.sendUnaryData<GetStockAggregatedResponse>
+    ) {
+      const n = getExpectedResponseCount();
+      const responses: GetStockResponse[] = [];
+      for (let i = 0; i < n; i++) {
+        const items = call.request.skus.map((sku) => ({
+          sku,
+          available: 100,
+          reserved: 0,
+          warehouse: { warehouseId: `wh-${i + 1}`, region: call.request.region },
+          attributes: { source: `local-stub-${i}` }
+        }));
+        responses.push({
+          items,
+          context: call.request.context
+        });
+      }
+      callback(null, { responses });
     }
   });
 
@@ -384,6 +407,19 @@ export const startNotificationServiceServer = async (): Promise<started_server> 
       call: grpc.ServerUnaryCall<SendEmailRequest, SendEmailResponse>,
       callback: grpc.sendUnaryData<SendEmailResponse>
     ) {
+      // Test hook: force a specific gRPC error for error-code table tests
+      if (call.request.messageId === "force-error-code-4") {
+        callback(
+          {
+            name: "DeadlineExceeded",
+            message: "Deadline exceeded (test)",
+            code: grpc.status.DEADLINE_EXCEEDED,
+            details: "test"
+          } as grpc.ServiceError,
+          null
+        );
+        return;
+      }
       callback(null, {
         status: "SENT",
         messageId: call.request.messageId,
@@ -401,6 +437,18 @@ export const startNotificationServiceServer = async (): Promise<started_server> 
         metadata: { source: "local-stub" },
         context: call.request.context
       });
+    },
+    sendEmailStream(call: grpc.ServerWritableStream<SendEmailRequest, SendEmailResponse>) {
+      const n = getExpectedResponseCount();
+      for (let i = 0; i < n; i++) {
+        call.write({
+          messageId: call.request.messageId,
+          status: "SENT",
+          metadata: { source: `local-stub-${i}` },
+          context: call.request.context
+        });
+      }
+      call.end();
     }
   });
 

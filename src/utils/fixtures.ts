@@ -1,12 +1,12 @@
 import * as grpc from "@grpc/grpc-js";
 import { createChannelCredentialsFromEnv, type grpc_tls_env } from "@utils/grpc/credentials";
-import { AuditServiceApi } from "@services/audit";
-import { InventoryServiceApi } from "@services/inventory";
-import { NotificationServiceApi } from "@services/notification";
-import { OrderServiceApi } from "@services/order";
-import { PaymentServiceApi } from "@services/payment";
-import { ShippingServiceApi } from "@services/shipping";
-import { UserServiceApi } from "@services/user";
+import { AuditServiceApi } from "@services/audit/auditService";
+import { InventoryServiceApi } from "@services/inventory/inventoryService";
+import { NotificationServiceApi } from "@services/notification/notificationService";
+import { OrderServiceApi } from "@services/order/orderService";
+import { PaymentServiceApi } from "@services/payment/paymentService";
+import { ShippingServiceApi } from "@services/shipping/shippingService";
+import { UserServiceApi } from "@services/user/userService";
 import { getEnvironment } from "@utils/environments";
 import { logger, type Logger } from "@utils/logger";
 

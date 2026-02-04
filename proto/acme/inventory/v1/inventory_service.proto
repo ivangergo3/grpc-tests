@@ -6,6 +6,8 @@ import "acme/common/v1/common.proto";
 
 service InventoryService {
   rpc GetStock(GetStockRequest) returns (GetStockResponse);
+  /** Aggregated: returns one message with N GetStockResponse entries (1–3) based on SYSTEM_B_ENABLED / SYSTEM_C_ENABLED. */
+  rpc GetStockAggregated(GetStockRequest) returns (GetStockAggregatedResponse);
   rpc ReserveStock(ReserveStockRequest) returns (ReserveStockResponse);
 }
 
@@ -33,6 +35,11 @@ message GetStockRequest {
 message GetStockResponse {
   repeated StockItem items = 1;
   acme.common.v1.RequestContext context = 2;
+}
+
+/** One message containing N logical responses (for multi-response / aggregated testing). */
+message GetStockAggregatedResponse {
+  repeated GetStockResponse responses = 1;
 }
 
 message ReservationLine {

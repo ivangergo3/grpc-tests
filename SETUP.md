@@ -38,7 +38,10 @@ If you can’t copy the whole `grpc-tests/` folder as-is, create a new `grpc-tes
 - `src/utils/grpc/credentials.ts`
 - `src/utils/test/globals.d.ts`
 - `src/utils/test/vitest.setup.ts`
-- `src/services/base.ts`
+- `src/services/baseService.ts`
+- `src/services/baseRequest.ts`
+- `src/services/baseSuccess.ts`
+- `src/services/baseFailure.ts`
 
 ### 1.4) Optional: copy local demo infra (offline tests)
 
@@ -146,7 +149,7 @@ They are thin wrappers around generated `grpc-js` clients that:
 
 Base class:
 
-- `src/services/base.ts` (`BaseGrpcService`)
+- `src/services/baseService.ts` (`BaseGrpcService`)
 
 Typical workflow for a new service:
 
@@ -256,10 +259,9 @@ JUnit output:
 
 ## 9) CI notes (minimal configuration)
 
-CI examples:
+CI:
 
-- Jenkins pipelines live in `grpc-tests/jenkins/`
-- Local Jenkins demo setup: see `grpc-tests/Jenkins.md`
+- **GitHub Actions**: workflow in `.github/workflows/test.yml` runs all tests on push/PR to `main` or `master` (Bun + `bun run test`).
 
 Recommended CI env vars:
 

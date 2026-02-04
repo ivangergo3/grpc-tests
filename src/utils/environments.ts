@@ -28,6 +28,16 @@ export type test_timeouts_config = {
   runTimeoutMs: number;
 };
 
+/**
+ * Which systems are "online" for multi-response behavior.
+ * System A is always on; B and C are off by default and can be enabled via env vars.
+ */
+export type systems_config = {
+  systemA: boolean;
+  systemB: boolean;
+  systemC: boolean;
+};
+
 export type environment_config = {
   name: string;
   timeouts: test_timeouts_config;
@@ -110,3 +120,40 @@ export const getSelectedEnvironmentName = (): environment_name => {
 };
 
 export const getEnvironment = (): environment_config => environments[getSelectedEnvironmentName()];
+
+/**
+ * System flags for multi-response: which systems are online.
+ * - System A: always true.
+ * - System B: true if SYSTEM_B_ENABLED is "true" or "1".
+ * - System C: true if SYSTEM_C_ENABLED is "true" or "1".
+ *
+ * Single source of truth for the service layer and request/verification layer.
+ */
+export const getSystems = (): systems_config => {
+  const b = process.env.SYSTEM_B_ENABLED === "true" || process.env.SYSTEM_B_ENABLED === "1";
+  const c = process.env.SYSTEM_C_ENABLED === "true" || process.env.SYSTEM_C_ENABLED === "1";
+  return {
+    systemA: true,
+    systemB: b,
+    systemC: c
+  };
+};
+
+/**
+ * Expected response count (1–3) for multi-response RPCs based on which systems are on.
+ * A only → 1; A+B → 2; A+B+C → 3.
+ */
+export const getExpectedResponseCount = (): number => {
+  const { systemB, systemC } = getSystems();
+  return 1 + (systemB ? 1 : 0) + (systemC ? 1 : 0);
+};
+
+/**
+ * Optional base host:port for gRPC targets (from GRPC_BASE_URL).
+ * When set, can be used to build service targets (e.g. `${baseUrl}` or service-specific host).
+ * Undefined when not set.
+ */
+export const getGrpcBaseUrl = (): string | undefined => {
+  const v = process.env.GRPC_BASE_URL?.trim();
+  return v === "" ? undefined : v;
+};

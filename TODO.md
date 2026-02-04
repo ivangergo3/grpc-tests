@@ -6,7 +6,7 @@ This file tracks the next upgrades to make this gRPC test harness more usable in
 
 Goal: **no noisy terminal logs**, but when a gRPC call fails you can open the Allure report and see the useful payloads immediately.
 
-- [x] Add a reporting-capable unary wrapper in `src/services/base.ts` that can attach artifacts to Allure on error (and optionally on success).
+- [x] Add a reporting-capable unary wrapper in `src/services/baseService.ts` that can attach artifacts to Allure on error (and optionally on success).
 - [x] Route ApiObjects through the wrapper (User/Order/Inventory/Payment/Shipping/Notification/Audit).
 - [ ] Add a stable demo test that triggers a gRPC failure in a normal local run (blocked in this sandbox because local servers can’t bind to `127.0.0.1`).
 - [ ] Add “response-on-error” where available (today we attach request + error summary; responses often don’t exist on gRPC unary failures).

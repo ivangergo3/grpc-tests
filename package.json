@@ -6,11 +6,6 @@
   "scripts": {
     "gen": "bash ./scripts/gen-protos.sh",
     "gen:ps": "powershell -ExecutionPolicy Bypass -File ./scripts/gen-protos.ps1",
-    "jenkins:up": "docker compose -f ./jenkins/local/compose.yml up -d --build",
-    "jenkins:down": "docker compose -f ./jenkins/local/compose.yml down",
-    "jenkins:restart": "docker compose -f ./jenkins/local/compose.yml restart",
-    "jenkins:logs": "docker compose -f ./jenkins/local/compose.yml logs -f --tail=200",
-    "jenkins:password": "docker exec -it grpc-tests-jenkins cat /var/jenkins_home/secrets/initialAdminPassword",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
