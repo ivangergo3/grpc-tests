@@ -96,3 +96,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
+        continue-on-error: true  # 404 until Pages enabled: Settings → Pages → Source: GitHub Actions
