@@ -49,6 +49,15 @@ jobs:
         run: bun run allure:generate
         continue-on-error: true
 
+      - name: Fix Allure report base path for GitHub Pages
+        if: always() && steps.allure.outcome == 'success'
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          BASE_HREF="/${REPO_NAME}/"
+          for f in allure-report/*.html; do
+            [ -f "$f" ] && sed -i "s|<head>|<head><base href=\"${BASE_HREF}\">|" "$f"
+          done
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

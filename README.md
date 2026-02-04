@@ -192,7 +192,7 @@ This is CI-friendly (GitLab/Jenkins/GitHub/etc).
 When using the workflow in `.github/workflows/test.yml`:
 
 1. **Download** – After each run, open the **Actions** tab → select the run → scroll to **Artifacts**. Download **allure-report** (or **test-results**), then open `index.html` from the report zip in a browser.
-2. **Open in browser** – On push to `main`/`master`, the Allure report is deployed to **GitHub Pages**. Enable Pages in the repo: **Settings → Pages → Source: GitHub Actions**. The report URL is then shown in the **deploy-report** job summary (e.g. `https://<owner>.github.io/<repo>/`). Open that URL to view the latest report without downloading.
+2. **Open in browser** – On push to `main`/`master`, the Allure report is deployed to **GitHub Pages**. You must enable it once: go to the repo **Settings → Pages**, under **Build and deployment** set **Source** to **GitHub Actions** (not “Deploy from a branch”). After the next run, the **deploy-report** job will show the report URL (e.g. `https://<owner>.github.io/<repo>/`). If deploy fails with “Not Found”, Pages is not enabled or the source is not set to GitHub Actions.
 
 ---
 
