@@ -1,51 +1,83 @@
-import type { Money } from "@gen/acme/common/v1/common";
 import type {
   AuthorizePaymentRequest,
   CapturePaymentRequest,
-  PaymentMethod
+  PaymentMethod,
+  WatchPaymentRequest
 } from "@gen/acme/payment/v1/payment_service";
-import { defaultBaseRequestFields, type BaseRequestFields } from "../baseRequest";
+import { buildBaseRequestFields, withDefaults } from "@services/base";
+import type { AuthorizePaymentParams, CapturePaymentParams, WatchPaymentParams } from "@services/types";
 
-export type AuthorizePaymentParams = BaseRequestFields & {
-  paymentId: string;
-  orderId: string;
-  userId: string;
-  amount?: Money;
-  method?: PaymentMethod;
-};
-
-export const buildAuthorizePaymentRequest = (params: AuthorizePaymentParams): AuthorizePaymentRequest => {
-  const base = defaultBaseRequestFields({
-    context: params.context,
-    actor: params.actor,
-    headers: params.headers
-  });
+export const buildAuthorizePaymentRequest = (
+  overrides: Partial<AuthorizePaymentParams> = {}
+): AuthorizePaymentRequest => {
+  const params = withDefaults<AuthorizePaymentParams>(
+    {
+      paymentId: "p-1",
+      orderId: "ord-1",
+      userId: "123",
+      amount: { amount: "19.99", currency: "EUR" },
+      method: { methodId: "pm-1", type: "CARD", attributes: {} } as PaymentMethod,
+      context: undefined,
+      actor: undefined,
+      headers: undefined
+    },
+    overrides
+  );
+  const base = buildBaseRequestFields(params);
   return {
-    paymentId: params.paymentId,
-    orderId: params.orderId,
-    userId: params.userId,
+    paymentId: params.paymentId ?? "p-1",
+    orderId: params.orderId ?? "ord-1",
+    userId: params.userId ?? "123",
     amount: params.amount,
     method: params.method,
     context: base.context,
     actor: base.actor,
-    headers: base.headers ?? {}
+    headers: base.headers
   };
 };
 
-export type CapturePaymentParams = BaseRequestFields & {
-  paymentId: string;
-  amount?: Money;
-};
-
-export const buildCapturePaymentRequest = (params: CapturePaymentParams): CapturePaymentRequest => {
-  const base = defaultBaseRequestFields({
-    context: params.context,
-    headers: params.headers
-  });
+export const buildCapturePaymentRequest = (
+  overrides: Partial<CapturePaymentParams> = {}
+): CapturePaymentRequest => {
+  const params = withDefaults<CapturePaymentParams>(
+    {
+      paymentId: "p-1",
+      amount: { amount: "19.99", currency: "EUR" },
+      context: undefined,
+      actor: undefined,
+      headers: undefined
+    },
+    overrides
+  );
+  const base = buildBaseRequestFields(params);
   return {
-    paymentId: params.paymentId,
+    paymentId: params.paymentId ?? "p-1",
     amount: params.amount,
     context: base.context,
-    headers: base.headers ?? {}
+    headers: base.headers,
+    actor: base.actor
+  };
+};
+
+export const buildWatchPaymentRequest = (
+  overrides: Partial<WatchPaymentParams> = {}
+): WatchPaymentRequest => {
+  const params = withDefaults<WatchPaymentParams>(
+    {
+      paymentId: "p-1",
+      afterEventIndex: undefined,
+      context: undefined,
+      actor: undefined,
+      headers: undefined
+    },
+    overrides
+  );
+  const base = buildBaseRequestFields(params);
+  return {
+    paymentId: params.paymentId ?? "p-1",
+    afterEventIndex: params.afterEventIndex,
+    context: base.context,
+    actor: base.actor,
+    headers: base.headers
   };
 };

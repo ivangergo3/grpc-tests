@@ -13,9 +13,10 @@
     "outDir": "dist",
     "rootDir": ".",
     "strict": true,
+    "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src", "vitest.config.ts"]
+  "include": ["src", "test-server", "vitest.config.ts"]
 }

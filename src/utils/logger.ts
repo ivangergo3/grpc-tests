@@ -1,5 +1,15 @@
 export type LogLevel = "debug" | "info" | "warn" | "error" | "silent";
 
+export type Logger = {
+  debug: (msg: string, ...args: unknown[]) => void;
+  info: (msg: string, ...args: unknown[]) => void;
+  warn: (msg: string, ...args: unknown[]) => void;
+  error: (msg: string, ...args: unknown[]) => void;
+  /** Alias for info(). */
+  log: (msg: string, ...args: unknown[]) => void;
+  child: (scope: string) => Logger;
+};
+
 const levelOrder: Record<LogLevel, number> = {
   debug: 10,
   info: 20,
@@ -16,16 +26,6 @@ const normalizeLevel = (input: unknown): LogLevel => {
   if (raw === "error") return "error";
   if (raw === "silent" || raw === "none" || raw === "off") return "silent";
   return "info";
-};
-
-export type Logger = {
-  debug: (msg: string, ...args: unknown[]) => void;
-  info: (msg: string, ...args: unknown[]) => void;
-  warn: (msg: string, ...args: unknown[]) => void;
-  error: (msg: string, ...args: unknown[]) => void;
-  /** Alias for info(). */
-  log: (msg: string, ...args: unknown[]) => void;
-  child: (scope: string) => Logger;
 };
 
 const formatPrefix = (level: LogLevel, scope?: string): string => {

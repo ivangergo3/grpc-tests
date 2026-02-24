@@ -8,37 +8,48 @@ $ErrorActionPreference = "Stop"
 
 $RootDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $ProtoDir = Join-Path $RootDir "proto"
-$OutDir = Join-Path $RootDir "src\gen"
+$OutDir = Join-Path $RootDir "src" "gen"
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
-$TsProtoPlugin = Join-Path $RootDir "node_modules\.bin\protoc-gen-ts_proto.cmd"
+$TsProtoPlugin = Join-Path $RootDir "node_modules" ".bin" "protoc-gen-ts_proto"
+$TsProtoPluginCmd = $TsProtoPlugin + ".cmd"
+if (Test-Path $TsProtoPluginCmd) {
+  $TsProtoPlugin = $TsProtoPluginCmd
+}
+
+$Protoc = Join-Path $RootDir "node_modules" ".bin" "grpc_tools_node_protoc"
+$ProtocCmd = $Protoc + ".cmd"
+if (Test-Path $ProtocCmd) {
+  $Protoc = $ProtocCmd
+}
+
 if (!(Test-Path $TsProtoPlugin)) {
-  $TsProtoPlugin = Join-Path $RootDir "node_modules\.bin\protoc-gen-ts_proto"
-}
-
-$Protoc = Join-Path $RootDir "node_modules\.bin\grpc_tools_node_protoc.cmd"
-if (!(Test-Path $Protoc)) {
-  $Protoc = Join-Path $RootDir "node_modules\.bin\grpc_tools_node_protoc"
-}
-
-if (!(Test-Path $TsProtoPlugin)) {
-  throw "ts-proto plugin not found. Run: bun install (or npm install)"
+  Write-Error "ERROR: ts-proto plugin not found at: $TsProtoPlugin"
+  Write-Error "Run: bun install (or npm install)"
+  exit 1
 }
 
 if (!(Test-Path $Protoc)) {
-  throw "grpc_tools_node_protoc not found. Run: bun install (or npm install)"
+  Write-Error "ERROR: grpc_tools_node_protoc not found at: $Protoc"
+  Write-Error "Run: bun install (or npm install)"
+  exit 1
 }
 
-$ProtoFiles = Get-ChildItem -Path $ProtoDir -Recurse -Filter *.proto | ForEach-Object { $_.FullName }
+$ProtoFiles =
+  Get-ChildItem -Path $ProtoDir -Recurse -File -Filter *.proto |
+    Sort-Object FullName |
+    ForEach-Object { $_.FullName }
+
 if ($ProtoFiles.Count -eq 0) {
-  throw "No .proto files found under $ProtoDir"
+  Write-Error "ERROR: no .proto files found under $ProtoDir"
+  exit 1
 }
 
 Write-Host "Generating TS from protos..." -ForegroundColor Cyan
-Write-Host " - proto root: $ProtoDir"
-Write-Host " - out dir:    $OutDir"
-Write-Host " - files:      $($ProtoFiles.Count)"
+Write-Host "- proto root: $ProtoDir"
+Write-Host "- out dir:    $OutDir"
+Write-Host "- files:      $($ProtoFiles.Count)"
 
 & $Protoc `
   -I $ProtoDir `

@@ -6,53 +6,78 @@ import type {
   SearchUsersResponse
 } from "@gen/acme/user/v1/user_service";
 import { UserServiceClient } from "@gen/acme/user/v1/user_service";
-import { BaseGrpcService, type unary_call_options } from "@services/baseService";
+
+import { BaseGrpcService } from "@services/base";
+
+import type {
+  UserServiceStreamClient,
+  ChannelCredentialsInput,
+  GetUserParams,
+  SearchUsersParams
+} from "@services/types";
+
 import {
   buildGetUserRequest,
   buildSearchUsersRequest,
-  type GetUserParams,
-  type SearchUsersParams
+  buildSearchUsersStreamRequest
 } from "./userRequest";
 
 export class UserServiceApi extends BaseGrpcService<UserServiceClient> {
-  constructor(target: string, creds: grpc.ChannelCredentials, options?: grpc.ClientOptions) {
+  constructor(target: string, creds: ChannelCredentialsInput, options?: grpc.ClientOptions) {
     super(UserServiceClient, target, creds, options);
   }
 
-  getUser(req: GetUserRequest, opts: unary_call_options = {}): Promise<GetUserResponse> {
-    const metadata = this.metadata(opts);
-    const callOpts = this.callOptions(opts);
+  getUser(req: GetUserRequest, metadata?: grpc.Metadata): Promise<GetUserResponse> {
+    const md = this.metadata(metadata);
     return this.unaryCall<GetUserResponse>((cb) => {
-      if (callOpts) return this.client.getUser(req, metadata, callOpts, cb);
-      return this.client.getUser(req, metadata, cb);
+      return this.client.getUser(req, md, cb);
     });
   }
 
-  searchUsers(
-    req: SearchUsersRequest,
-    opts: unary_call_options = {}
-  ): Promise<SearchUsersResponse> {
-    const metadata = this.metadata(opts);
-    const callOpts = this.callOptions(opts);
+  /** Build request from params (base + child) */
+  getUserWithParams(params: GetUserParams, metadata?: grpc.Metadata): Promise<GetUserResponse> {
+    return this.getUser(buildGetUserRequest(params), metadata);
+  }
+
+  searchUsers(req: SearchUsersRequest, metadata?: grpc.Metadata): Promise<SearchUsersResponse> {
+    const md = this.metadata(metadata);
     return this.unaryCall<SearchUsersResponse>((cb) => {
-      if (callOpts) return this.client.searchUsers(req, metadata, callOpts, cb);
-      return this.client.searchUsers(req, metadata, cb);
+      return this.client.searchUsers(req, md, cb);
     });
   }
 
-  /** Build request from params (base + child), send, return raw response (5.1). */
-  getUserWithParams(
-    params: GetUserParams,
-    opts: unary_call_options = {}
-  ): Promise<GetUserResponse> {
-    return this.getUser(buildGetUserRequest(params), opts);
-  }
-
-  /** Build request from params (base + child), send, return raw response (5.1). */
+  /** Build request from params (base + child) */
   searchUsersWithParams(
     params: SearchUsersParams,
-    opts: unary_call_options = {}
+    metadata?: grpc.Metadata
   ): Promise<SearchUsersResponse> {
-    return this.searchUsers(buildSearchUsersRequest(params), opts);
+    return this.searchUsers(buildSearchUsersRequest(params), metadata);
+  }
+
+  /**
+   * Server-streaming variant of SearchUsers, aggregated into a unary-like response.
+   */
+  searchUsersStream(
+    req: SearchUsersRequest,
+    metadata?: grpc.Metadata
+  ): Promise<SearchUsersResponse> {
+    const md = this.metadata(metadata);
+    const streamClient = this.client as unknown as UserServiceStreamClient;
+
+    return this.streamAggregate(
+      () => streamClient.searchUsersStream(req, md, {}),
+      (chunks) => ({
+        users: this.pickDefined(chunks, (c) => c.user),
+        context: this.last(chunks)?.context ?? req.context
+      })
+    );
+  }
+
+  /** Build request from params (base + child) */
+  searchUsersStreamWithParams(
+    params: SearchUsersParams,
+    metadata?: grpc.Metadata
+  ): Promise<SearchUsersResponse> {
+    return this.searchUsersStream(buildSearchUsersStreamRequest(params), metadata);
   }
 }

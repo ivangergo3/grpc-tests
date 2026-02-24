@@ -11,7 +11,9 @@ import {
   type ChannelCredentials,
   Client,
   type ClientOptions,
+  type ClientReadableStream,
   type ClientUnaryCall,
+  type handleServerStreamingCall,
   type handleUnaryCall,
   makeGenericClientConstructor,
   type Metadata,
@@ -21,6 +23,51 @@ import {
 import { Actor, Address, PageInfo, Pagination, RequestContext } from "../../common/v1/common";
 
 export const protobufPackage = "acme.user.v1";
+
+export enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0,
+  USER_STATUS_ACTIVE = 1,
+  USER_STATUS_INACTIVE = 2,
+  USER_STATUS_SUSPENDED = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function userStatusFromJSON(object: any): UserStatus {
+  switch (object) {
+    case 0:
+    case "USER_STATUS_UNSPECIFIED":
+      return UserStatus.USER_STATUS_UNSPECIFIED;
+    case 1:
+    case "USER_STATUS_ACTIVE":
+      return UserStatus.USER_STATUS_ACTIVE;
+    case 2:
+    case "USER_STATUS_INACTIVE":
+      return UserStatus.USER_STATUS_INACTIVE;
+    case 3:
+    case "USER_STATUS_SUSPENDED":
+      return UserStatus.USER_STATUS_SUSPENDED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return UserStatus.UNRECOGNIZED;
+  }
+}
+
+export function userStatusToJSON(object: UserStatus): string {
+  switch (object) {
+    case UserStatus.USER_STATUS_UNSPECIFIED:
+      return "USER_STATUS_UNSPECIFIED";
+    case UserStatus.USER_STATUS_ACTIVE:
+      return "USER_STATUS_ACTIVE";
+    case UserStatus.USER_STATUS_INACTIVE:
+      return "USER_STATUS_INACTIVE";
+    case UserStatus.USER_STATUS_SUSPENDED:
+      return "USER_STATUS_SUSPENDED";
+    case UserStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
 
 export interface UserProfile {
   fullName: string;
@@ -40,6 +87,12 @@ export interface User {
   roles: string[];
   profile?: UserProfile | undefined;
   attributes: { [key: string]: string };
+  /** Presence-aware optional field example. */
+  phoneNumber?:
+    | string
+    | undefined;
+  /** Enum example (prefer this over stringly-typed statuses). */
+  status?: UserStatus | undefined;
 }
 
 export interface User_AttributesEntry {
@@ -72,6 +125,12 @@ export interface SearchUsersRequest {
   context?: RequestContext | undefined;
   actor?: Actor | undefined;
   headers: { [key: string]: string };
+  /**
+   * Example: keep a deprecated knob rather than removing it.
+   *
+   * @deprecated
+   */
+  includeDeleted?: boolean | undefined;
 }
 
 export interface SearchUsersRequest_HeadersEntry {
@@ -83,6 +142,13 @@ export interface SearchUsersResponse {
   users: User[];
   page?: PageInfo | undefined;
   context?: RequestContext | undefined;
+}
+
+export interface SearchUsersStreamResponse {
+  user?: User | undefined;
+  context?: RequestContext | undefined;
+  index: number;
+  isLast: boolean;
 }
 
 function createBaseUserProfile(): UserProfile {
@@ -285,7 +351,16 @@ export const UserProfile_PreferencesEntry: MessageFns<UserProfile_PreferencesEnt
 };
 
 function createBaseUser(): User {
-  return { userId: "", email: "", isActive: false, roles: [], profile: undefined, attributes: {} };
+  return {
+    userId: "",
+    email: "",
+    isActive: false,
+    roles: [],
+    profile: undefined,
+    attributes: {},
+    phoneNumber: undefined,
+    status: undefined,
+  };
 }
 
 export const User: MessageFns<User> = {
@@ -308,6 +383,12 @@ export const User: MessageFns<User> = {
     globalThis.Object.entries(message.attributes).forEach(([key, value]: [string, string]) => {
       User_AttributesEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).join();
     });
+    if (message.phoneNumber !== undefined) {
+      writer.uint32(58).string(message.phoneNumber);
+    }
+    if (message.status !== undefined) {
+      writer.uint32(64).int32(message.status);
+    }
     return writer;
   },
 
@@ -369,6 +450,22 @@ export const User: MessageFns<User> = {
           }
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.phoneNumber = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -402,6 +499,12 @@ export const User: MessageFns<User> = {
           {},
         )
         : {},
+      phoneNumber: isSet(object.phoneNumber)
+        ? globalThis.String(object.phoneNumber)
+        : isSet(object.phone_number)
+        ? globalThis.String(object.phone_number)
+        : undefined,
+      status: isSet(object.status) ? userStatusFromJSON(object.status) : undefined,
     };
   },
 
@@ -431,6 +534,12 @@ export const User: MessageFns<User> = {
         });
       }
     }
+    if (message.phoneNumber !== undefined) {
+      obj.phoneNumber = message.phoneNumber;
+    }
+    if (message.status !== undefined) {
+      obj.status = userStatusToJSON(message.status);
+    }
     return obj;
   },
 
@@ -455,6 +564,8 @@ export const User: MessageFns<User> = {
       },
       {},
     );
+    message.phoneNumber = object.phoneNumber ?? undefined;
+    message.status = object.status ?? undefined;
     return message;
   },
 };
@@ -849,7 +960,15 @@ export const GetUserResponse: MessageFns<GetUserResponse> = {
 };
 
 function createBaseSearchUsersRequest(): SearchUsersRequest {
-  return { query: "", activeOnly: false, page: undefined, context: undefined, actor: undefined, headers: {} };
+  return {
+    query: "",
+    activeOnly: false,
+    page: undefined,
+    context: undefined,
+    actor: undefined,
+    headers: {},
+    includeDeleted: undefined,
+  };
 }
 
 export const SearchUsersRequest: MessageFns<SearchUsersRequest> = {
@@ -872,6 +991,9 @@ export const SearchUsersRequest: MessageFns<SearchUsersRequest> = {
     globalThis.Object.entries(message.headers).forEach(([key, value]: [string, string]) => {
       SearchUsersRequest_HeadersEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).join();
     });
+    if (message.includeDeleted !== undefined) {
+      writer.uint32(56).bool(message.includeDeleted);
+    }
     return writer;
   },
 
@@ -933,6 +1055,14 @@ export const SearchUsersRequest: MessageFns<SearchUsersRequest> = {
           }
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.includeDeleted = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -962,6 +1092,11 @@ export const SearchUsersRequest: MessageFns<SearchUsersRequest> = {
           {},
         )
         : {},
+      includeDeleted: isSet(object.includeDeleted)
+        ? globalThis.Boolean(object.includeDeleted)
+        : isSet(object.include_deleted)
+        ? globalThis.Boolean(object.include_deleted)
+        : undefined,
     };
   },
 
@@ -991,6 +1126,9 @@ export const SearchUsersRequest: MessageFns<SearchUsersRequest> = {
         });
       }
     }
+    if (message.includeDeleted !== undefined) {
+      obj.includeDeleted = message.includeDeleted;
+    }
     return obj;
   },
 
@@ -1017,6 +1155,7 @@ export const SearchUsersRequest: MessageFns<SearchUsersRequest> = {
       },
       {},
     );
+    message.includeDeleted = object.includeDeleted ?? undefined;
     return message;
   },
 };
@@ -1193,6 +1332,120 @@ export const SearchUsersResponse: MessageFns<SearchUsersResponse> = {
   },
 };
 
+function createBaseSearchUsersStreamResponse(): SearchUsersStreamResponse {
+  return { user: undefined, context: undefined, index: 0, isLast: false };
+}
+
+export const SearchUsersStreamResponse: MessageFns<SearchUsersStreamResponse> = {
+  encode(message: SearchUsersStreamResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.user !== undefined) {
+      User.encode(message.user, writer.uint32(10).fork()).join();
+    }
+    if (message.context !== undefined) {
+      RequestContext.encode(message.context, writer.uint32(18).fork()).join();
+    }
+    if (message.index !== 0) {
+      writer.uint32(24).int32(message.index);
+    }
+    if (message.isLast !== false) {
+      writer.uint32(32).bool(message.isLast);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SearchUsersStreamResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSearchUsersStreamResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.user = User.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.context = RequestContext.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.index = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.isLast = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SearchUsersStreamResponse {
+    return {
+      user: isSet(object.user) ? User.fromJSON(object.user) : undefined,
+      context: isSet(object.context) ? RequestContext.fromJSON(object.context) : undefined,
+      index: isSet(object.index) ? globalThis.Number(object.index) : 0,
+      isLast: isSet(object.isLast)
+        ? globalThis.Boolean(object.isLast)
+        : isSet(object.is_last)
+        ? globalThis.Boolean(object.is_last)
+        : false,
+    };
+  },
+
+  toJSON(message: SearchUsersStreamResponse): unknown {
+    const obj: any = {};
+    if (message.user !== undefined) {
+      obj.user = User.toJSON(message.user);
+    }
+    if (message.context !== undefined) {
+      obj.context = RequestContext.toJSON(message.context);
+    }
+    if (message.index !== 0) {
+      obj.index = Math.round(message.index);
+    }
+    if (message.isLast !== false) {
+      obj.isLast = message.isLast;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SearchUsersStreamResponse>, I>>(base?: I): SearchUsersStreamResponse {
+    return SearchUsersStreamResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SearchUsersStreamResponse>, I>>(object: I): SearchUsersStreamResponse {
+    const message = createBaseSearchUsersStreamResponse();
+    message.user = (object.user !== undefined && object.user !== null) ? User.fromPartial(object.user) : undefined;
+    message.context = (object.context !== undefined && object.context !== null)
+      ? RequestContext.fromPartial(object.context)
+      : undefined;
+    message.index = object.index ?? 0;
+    message.isLast = object.isLast ?? false;
+    return message;
+  },
+};
+
 export type UserServiceService = typeof UserServiceService;
 export const UserServiceService = {
   getUser: {
@@ -1213,11 +1466,22 @@ export const UserServiceService = {
     responseSerialize: (value: SearchUsersResponse): Buffer => Buffer.from(SearchUsersResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): SearchUsersResponse => SearchUsersResponse.decode(value),
   },
+  searchUsersStream: {
+    path: "/acme.user.v1.UserService/SearchUsersStream",
+    requestStream: false,
+    responseStream: true,
+    requestSerialize: (value: SearchUsersRequest): Buffer => Buffer.from(SearchUsersRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SearchUsersRequest => SearchUsersRequest.decode(value),
+    responseSerialize: (value: SearchUsersStreamResponse): Buffer =>
+      Buffer.from(SearchUsersStreamResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): SearchUsersStreamResponse => SearchUsersStreamResponse.decode(value),
+  },
 } as const;
 
 export interface UserServiceServer extends UntypedServiceImplementation {
   getUser: handleUnaryCall<GetUserRequest, GetUserResponse>;
   searchUsers: handleUnaryCall<SearchUsersRequest, SearchUsersResponse>;
+  searchUsersStream: handleServerStreamingCall<SearchUsersRequest, SearchUsersStreamResponse>;
 }
 
 export interface UserServiceClient extends Client {
@@ -1251,6 +1515,15 @@ export interface UserServiceClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: SearchUsersResponse) => void,
   ): ClientUnaryCall;
+  searchUsersStream(
+    request: SearchUsersRequest,
+    options?: Partial<CallOptions>,
+  ): ClientReadableStream<SearchUsersStreamResponse>;
+  searchUsersStream(
+    request: SearchUsersRequest,
+    metadata?: Metadata,
+    options?: Partial<CallOptions>,
+  ): ClientReadableStream<SearchUsersStreamResponse>;
 }
 
 export const UserServiceClient = makeGenericClientConstructor(

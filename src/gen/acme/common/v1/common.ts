@@ -9,14 +9,68 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "acme.common.v1";
 
+export enum CurrencyCode {
+  CURRENCY_CODE_UNSPECIFIED = 0,
+  CURRENCY_CODE_EUR = 1,
+  CURRENCY_CODE_USD = 2,
+  CURRENCY_CODE_GBP = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function currencyCodeFromJSON(object: any): CurrencyCode {
+  switch (object) {
+    case 0:
+    case "CURRENCY_CODE_UNSPECIFIED":
+      return CurrencyCode.CURRENCY_CODE_UNSPECIFIED;
+    case 1:
+    case "CURRENCY_CODE_EUR":
+      return CurrencyCode.CURRENCY_CODE_EUR;
+    case 2:
+    case "CURRENCY_CODE_USD":
+      return CurrencyCode.CURRENCY_CODE_USD;
+    case 3:
+    case "CURRENCY_CODE_GBP":
+      return CurrencyCode.CURRENCY_CODE_GBP;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return CurrencyCode.UNRECOGNIZED;
+  }
+}
+
+export function currencyCodeToJSON(object: CurrencyCode): string {
+  switch (object) {
+    case CurrencyCode.CURRENCY_CODE_UNSPECIFIED:
+      return "CURRENCY_CODE_UNSPECIFIED";
+    case CurrencyCode.CURRENCY_CODE_EUR:
+      return "CURRENCY_CODE_EUR";
+    case CurrencyCode.CURRENCY_CODE_USD:
+      return "CURRENCY_CODE_USD";
+    case CurrencyCode.CURRENCY_CODE_GBP:
+      return "CURRENCY_CODE_GBP";
+    case CurrencyCode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface RequestContext {
   requestId: string;
+  /** Optional correlation/tracing fields (presence-aware). */
+  traceId?: string | undefined;
+  correlationId?: string | undefined;
 }
 
 export interface Actor {
   subject: string;
   tenant: string;
   roles: string[];
+  /**
+   * Example of a deprecated field kept for compatibility.
+   *
+   * @deprecated
+   */
+  userId?: string | undefined;
 }
 
 export interface Address {
@@ -30,7 +84,13 @@ export interface Address {
 export interface Money {
   /** Decimal as string for simplicity in this demo. */
   amount: string;
+  /**
+   * Prefer currency_code; kept for backwards compatibility.
+   *
+   * @deprecated
+   */
   currency: string;
+  currencyCode?: CurrencyCode | undefined;
 }
 
 export interface Pagination {
@@ -43,13 +103,19 @@ export interface PageInfo {
 }
 
 function createBaseRequestContext(): RequestContext {
-  return { requestId: "" };
+  return { requestId: "", traceId: undefined, correlationId: undefined };
 }
 
 export const RequestContext: MessageFns<RequestContext> = {
   encode(message: RequestContext, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.requestId !== "") {
       writer.uint32(10).string(message.requestId);
+    }
+    if (message.traceId !== undefined) {
+      writer.uint32(18).string(message.traceId);
+    }
+    if (message.correlationId !== undefined) {
+      writer.uint32(26).string(message.correlationId);
     }
     return writer;
   },
@@ -69,6 +135,22 @@ export const RequestContext: MessageFns<RequestContext> = {
           message.requestId = reader.string();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.traceId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.correlationId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -85,6 +167,16 @@ export const RequestContext: MessageFns<RequestContext> = {
         : isSet(object.request_id)
         ? globalThis.String(object.request_id)
         : "",
+      traceId: isSet(object.traceId)
+        ? globalThis.String(object.traceId)
+        : isSet(object.trace_id)
+        ? globalThis.String(object.trace_id)
+        : undefined,
+      correlationId: isSet(object.correlationId)
+        ? globalThis.String(object.correlationId)
+        : isSet(object.correlation_id)
+        ? globalThis.String(object.correlation_id)
+        : undefined,
     };
   },
 
@@ -92,6 +184,12 @@ export const RequestContext: MessageFns<RequestContext> = {
     const obj: any = {};
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
+    }
+    if (message.traceId !== undefined) {
+      obj.traceId = message.traceId;
+    }
+    if (message.correlationId !== undefined) {
+      obj.correlationId = message.correlationId;
     }
     return obj;
   },
@@ -102,12 +200,14 @@ export const RequestContext: MessageFns<RequestContext> = {
   fromPartial<I extends Exact<DeepPartial<RequestContext>, I>>(object: I): RequestContext {
     const message = createBaseRequestContext();
     message.requestId = object.requestId ?? "";
+    message.traceId = object.traceId ?? undefined;
+    message.correlationId = object.correlationId ?? undefined;
     return message;
   },
 };
 
 function createBaseActor(): Actor {
-  return { subject: "", tenant: "", roles: [] };
+  return { subject: "", tenant: "", roles: [], userId: undefined };
 }
 
 export const Actor: MessageFns<Actor> = {
@@ -120,6 +220,9 @@ export const Actor: MessageFns<Actor> = {
     }
     for (const v of message.roles) {
       writer.uint32(26).string(v!);
+    }
+    if (message.userId !== undefined) {
+      writer.uint32(34).string(message.userId);
     }
     return writer;
   },
@@ -155,6 +258,14 @@ export const Actor: MessageFns<Actor> = {
           message.roles.push(reader.string());
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -169,6 +280,11 @@ export const Actor: MessageFns<Actor> = {
       subject: isSet(object.subject) ? globalThis.String(object.subject) : "",
       tenant: isSet(object.tenant) ? globalThis.String(object.tenant) : "",
       roles: globalThis.Array.isArray(object?.roles) ? object.roles.map((e: any) => globalThis.String(e)) : [],
+      userId: isSet(object.userId)
+        ? globalThis.String(object.userId)
+        : isSet(object.user_id)
+        ? globalThis.String(object.user_id)
+        : undefined,
     };
   },
 
@@ -183,6 +299,9 @@ export const Actor: MessageFns<Actor> = {
     if (message.roles?.length) {
       obj.roles = message.roles;
     }
+    if (message.userId !== undefined) {
+      obj.userId = message.userId;
+    }
     return obj;
   },
 
@@ -194,6 +313,7 @@ export const Actor: MessageFns<Actor> = {
     message.subject = object.subject ?? "";
     message.tenant = object.tenant ?? "";
     message.roles = object.roles?.map((e) => e) || [];
+    message.userId = object.userId ?? undefined;
     return message;
   },
 };
@@ -327,7 +447,7 @@ export const Address: MessageFns<Address> = {
 };
 
 function createBaseMoney(): Money {
-  return { amount: "", currency: "" };
+  return { amount: "", currency: "", currencyCode: undefined };
 }
 
 export const Money: MessageFns<Money> = {
@@ -337,6 +457,9 @@ export const Money: MessageFns<Money> = {
     }
     if (message.currency !== "") {
       writer.uint32(18).string(message.currency);
+    }
+    if (message.currencyCode !== undefined) {
+      writer.uint32(24).int32(message.currencyCode);
     }
     return writer;
   },
@@ -364,6 +487,14 @@ export const Money: MessageFns<Money> = {
           message.currency = reader.string();
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.currencyCode = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -377,6 +508,11 @@ export const Money: MessageFns<Money> = {
     return {
       amount: isSet(object.amount) ? globalThis.String(object.amount) : "",
       currency: isSet(object.currency) ? globalThis.String(object.currency) : "",
+      currencyCode: isSet(object.currencyCode)
+        ? currencyCodeFromJSON(object.currencyCode)
+        : isSet(object.currency_code)
+        ? currencyCodeFromJSON(object.currency_code)
+        : undefined,
     };
   },
 
@@ -388,6 +524,9 @@ export const Money: MessageFns<Money> = {
     if (message.currency !== "") {
       obj.currency = message.currency;
     }
+    if (message.currencyCode !== undefined) {
+      obj.currencyCode = currencyCodeToJSON(message.currencyCode);
+    }
     return obj;
   },
 
@@ -398,6 +537,7 @@ export const Money: MessageFns<Money> = {
     const message = createBaseMoney();
     message.amount = object.amount ?? "";
     message.currency = object.currency ?? "";
+    message.currencyCode = object.currencyCode ?? undefined;
     return message;
   },
 };

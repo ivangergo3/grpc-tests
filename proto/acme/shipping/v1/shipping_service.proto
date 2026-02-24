@@ -7,6 +7,22 @@ import "acme/common/v1/common.proto";
 service ShippingService {
   rpc CreateShipment(CreateShipmentRequest) returns (CreateShipmentResponse);
   rpc TrackShipment(TrackShipmentRequest) returns (TrackShipmentResponse);
+  rpc WatchShipment(WatchShipmentRequest) returns (stream TrackingEvent);
+}
+
+enum ShipmentStatus {
+  SHIPMENT_STATUS_UNSPECIFIED = 0;
+  SHIPMENT_STATUS_CREATED = 1;
+  SHIPMENT_STATUS_IN_TRANSIT = 2;
+  SHIPMENT_STATUS_DELIVERED = 3;
+  SHIPMENT_STATUS_FAILED = 4;
+}
+
+enum Carrier {
+  CARRIER_UNSPECIFIED = 0;
+  CARRIER_DHL = 1;
+  CARRIER_UPS = 2;
+  CARRIER_FEDEX = 3;
 }
 
 message ShipmentItem {
@@ -18,11 +34,17 @@ message ShipmentItem {
 message Shipment {
   string shipment_id = 1;
   string order_id = 2;
-  string carrier = 3;
-  string status = 4;
+  // Prefer carrier_code; kept for backwards compatibility.
+  string carrier = 3 [deprecated = true];
+  // Prefer status_code; kept for backwards compatibility.
+  string status = 4 [deprecated = true];
   repeated ShipmentItem items = 5;
   acme.common.v1.Address destination = 6;
   map<string, string> metadata = 7;
+
+  optional Carrier carrier_code = 8;
+  optional ShipmentStatus status_code = 9;
+  reserved 10 to 12;
 }
 
 message CreateShipmentRequest {
@@ -42,21 +64,38 @@ message CreateShipmentResponse {
 
 message TrackingEvent {
   string event_id = 1;
-  string timestamp = 2;
+  // Prefer timestamp_unix_ms; kept for backwards compatibility.
+  string timestamp = 2 [deprecated = true];
   string location = 3;
   string description = 4;
   map<string, string> attributes = 5;
+
+  optional int64 timestamp_unix_ms = 6;
+  reserved 7;
 }
 
 message TrackShipmentRequest {
   string shipment_id = 1;
   acme.common.v1.RequestContext context = 2;
   map<string, string> headers = 3;
+
+  acme.common.v1.Actor actor = 4;
+  reserved 5;
 }
 
 message TrackShipmentResponse {
   Shipment shipment = 1;
   repeated TrackingEvent events = 2;
   acme.common.v1.RequestContext context = 3;
+}
+
+message WatchShipmentRequest {
+  string shipment_id = 1;
+  acme.common.v1.RequestContext context = 2;
+  acme.common.v1.Actor actor = 3;
+  map<string, string> headers = 4;
+
+  // If set, stream events after this index (simple resume).
+  optional int64 after_event_index = 5;
 }
 

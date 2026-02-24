@@ -1,44 +1,36 @@
 import { defineConfig } from "vitest/config";
-import * as os from "node:os";
 import { fileURLToPath } from "node:url";
-import { getEnvironment } from "./src/utils/environments";
-import AllureVitestReporter from "allure-vitest/reporter";
+import AllureReporterEnhanced from "./src/utils/allureReporterEnhanced";
+import { loadDotEnvOnce } from "./src/utils/env";
 
-const parseRetry = (raw: string | undefined): number | undefined => {
+loadDotEnvOnce();
+
+const parseNonNegativeInt = (raw: string | undefined): number | undefined => {
   if (!raw) return undefined;
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 0) return undefined;
   return Math.floor(n);
 };
 
-const retry =
-  parseRetry(process.env.VITEST_RETRY ?? process.env.TEST_RETRY) ??
-  (process.env.CI ? 2 : getEnvironment().timeouts.retry);
-
-const parsePositiveInt = (raw: string | undefined): number | undefined => {
-  if (!raw) return undefined;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return undefined;
-  return Math.floor(n);
+const requireNonNegativeInt = (name: string): number => {
+  const v = parseNonNegativeInt(process.env[name]);
+  if (v === undefined) throw new Error(`Missing required env var: ${name}`);
+  return v;
 };
 
-// Global defaults for `expect.poll(...)` (override via env vars if needed)
-const expectPollTimeout =
-  parsePositiveInt(process.env.VITEST_EXPECT_POLL_TIMEOUT_MS) ??
-  parsePositiveInt(process.env.EXPECT_POLL_TIMEOUT_MS) ??
-  1_000;
-const expectPollInterval =
-  parsePositiveInt(process.env.VITEST_EXPECT_POLL_INTERVAL_MS) ??
-  parsePositiveInt(process.env.EXPECT_POLL_INTERVAL_MS) ??
-  50;
-
-const readBunVersion = (): string => {
-  const raw = (process.versions as Record<string, unknown>).bun;
-  return typeof raw === "string" ? raw : "";
+const requireNonEmptyString = (name: string): string => {
+  const v = process.env[name]?.trim();
+  if (!v) throw new Error(`Missing required env var: ${name}`);
+  return v;
 };
 
-const allureResultsDir = process.env.ALLURE_RESULTS_DIR ?? "allure-results";
-const junitOutputFile = process.env.JUNIT_OUTPUT_FILE ?? "test-results/junit.xml";
+const testTimeoutMs = requireNonNegativeInt("TEST_TIMEOUT_MS");
+const hookTimeoutMs = requireNonNegativeInt("HOOK_TIMEOUT_MS");
+const retry = requireNonNegativeInt("VITEST_RETRY");
+const expectPollTimeout = requireNonNegativeInt("EXPECT_POLL_TIMEOUT_MS");
+const expectPollInterval = requireNonNegativeInt("EXPECT_POLL_INTERVAL_MS");
+const junitOutputFile = requireNonEmptyString("JUNIT_OUTPUT_FILE");
+const allureResultsDir = requireNonEmptyString("ALLURE_RESULTS_DIR");
 
 export default defineConfig({
   resolve: {
@@ -49,8 +41,10 @@ export default defineConfig({
     }
   },
   test: {
-    testTimeout: getEnvironment().timeouts.testTimeoutMs,
-    hookTimeout: getEnvironment().timeouts.hookTimeoutMs,
+    fileParallelism: false,
+    maxWorkers: 1,
+    testTimeout: testTimeoutMs,
+    hookTimeout: hookTimeoutMs,
     retry,
     expect: {
       poll: {
@@ -58,21 +52,13 @@ export default defineConfig({
         interval: expectPollInterval
       }
     },
-    setupFiles: ["allure-vitest/setup", "src/utils/test/vitest.setup.ts"],
+    includeTaskLocation: true,
+    setupFiles: ["allure-vitest/setup", "src/utils/vitest.setup.ts"],
     reporters: [
-      // More diagnostic output in terminal, and plays nicely with Allure’s hierarchy.
       "verbose",
       "junit",
-      new AllureVitestReporter({
-        resultsDir: allureResultsDir,
-        environmentInfo: {
-          os_platform: os.platform(),
-          os_release: os.release(),
-          os_version: os.version(),
-          node_version: process.version,
-          bun_version: readBunVersion(),
-          test_env: String(process.env.TEST_ENV ?? "local")
-        }
+      new AllureReporterEnhanced({
+        resultsDir: allureResultsDir
       })
     ],
     outputFile: {

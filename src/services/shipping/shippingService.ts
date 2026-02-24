@@ -1,90 +1,98 @@
 import type * as grpc from "@grpc/grpc-js";
-
 import type {
   CreateShipmentRequest,
   CreateShipmentResponse,
   TrackShipmentRequest,
-  TrackShipmentResponse
+  TrackShipmentResponse,
+  WatchShipmentRequest
 } from "@gen/acme/shipping/v1/shipping_service";
 import { ShippingServiceClient } from "@gen/acme/shipping/v1/shipping_service";
-import { BaseGrpcService, type unary_call_options } from "@services/baseService";
+
+import { BaseGrpcService } from "@services/base";
+
+import type {
+  ShippingServiceStreamClient,
+  ChannelCredentialsInput,
+  WatchShipmentResponse,
+  CreateShipmentParams,
+  TrackShipmentParams,
+  WatchShipmentParams
+} from "@services/types";
+
 import {
   buildCreateShipmentRequest,
   buildTrackShipmentRequest,
-  type CreateShipmentParams,
-  type TrackShipmentParams
+  buildWatchShipmentRequest
 } from "./shippingRequest";
 
 export class ShippingServiceApi extends BaseGrpcService<ShippingServiceClient> {
-  constructor(target: string, creds: grpc.ChannelCredentials, options?: grpc.ClientOptions) {
+  constructor(target: string, creds: ChannelCredentialsInput, options?: grpc.ClientOptions) {
     super(ShippingServiceClient, target, creds, options);
   }
 
   createShipment(
     req: CreateShipmentRequest,
-    opts: unary_call_options = {}
+    metadata?: grpc.Metadata
   ): Promise<CreateShipmentResponse> {
-    const metadata = this.metadata(opts);
-    const callOpts = this.callOptions(opts);
-    const deadlineMs = opts.deadlineMs ?? this.defaultDeadlineMs();
-    const result: Promise<CreateShipmentResponse> = this.unaryCallWithReport<
-      CreateShipmentRequest,
-      CreateShipmentResponse
-    >(
-      {
-        rpc: "ShippingService.CreateShipment",
-        request: req,
-        metadata,
-        deadlineMs: deadlineMs > 0 ? deadlineMs : undefined
-      },
-      opts,
-      (cb) => {
-        if (callOpts) return this.client.createShipment(req, metadata, callOpts, cb);
-        return this.client.createShipment(req, metadata, cb);
-      }
-    );
-    return result;
+    const md = this.metadata(metadata);
+    return this.unaryCall<CreateShipmentResponse>((cb) => {
+      return this.client.createShipment(req, md, cb);
+    });
+  }
+
+  /** Build request from params (base + child) */
+  createShipmentWithParams(
+    params: CreateShipmentParams,
+    metadata?: grpc.Metadata
+  ): Promise<CreateShipmentResponse> {
+    return this.createShipment(buildCreateShipmentRequest(params), metadata);
   }
 
   trackShipment(
     req: TrackShipmentRequest,
-    opts: unary_call_options = {}
+    metadata?: grpc.Metadata
   ): Promise<TrackShipmentResponse> {
-    const metadata = this.metadata(opts);
-    const callOpts = this.callOptions(opts);
-    const deadlineMs = opts.deadlineMs ?? this.defaultDeadlineMs();
-    const result: Promise<TrackShipmentResponse> = this.unaryCallWithReport<
-      TrackShipmentRequest,
-      TrackShipmentResponse
-    >(
-      {
-        rpc: "ShippingService.TrackShipment",
-        request: req,
-        metadata,
-        deadlineMs: deadlineMs > 0 ? deadlineMs : undefined
-      },
-      opts,
-      (cb) => {
-        if (callOpts) return this.client.trackShipment(req, metadata, callOpts, cb);
-        return this.client.trackShipment(req, metadata, cb);
-      }
-    );
-    return result;
+    const md = this.metadata(metadata);
+    return this.unaryCall<TrackShipmentResponse>((cb) => {
+      return this.client.trackShipment(req, md, cb);
+    });
   }
 
-  /** Build request from params (base + child), send, return raw response (5.1). */
-  createShipmentWithParams(
-    params: CreateShipmentParams,
-    opts: unary_call_options = {}
-  ): Promise<CreateShipmentResponse> {
-    return this.createShipment(buildCreateShipmentRequest(params), opts);
-  }
-
-  /** Build request from params (base + child), send, return raw response (5.1). */
+  /** Build request from params (base + child) */
   trackShipmentWithParams(
     params: TrackShipmentParams,
-    opts: unary_call_options = {}
+    metadata?: grpc.Metadata
   ): Promise<TrackShipmentResponse> {
-    return this.trackShipment(buildTrackShipmentRequest(params), opts);
+    return this.trackShipment(buildTrackShipmentRequest(params), metadata);
+  }
+
+  /**
+   * Server-streaming: returns one "big" response object for easy verification.
+   */
+  watchShipment(
+    req: WatchShipmentRequest,
+    metadata?: grpc.Metadata
+  ): Promise<WatchShipmentResponse> {
+    const md = this.metadata(metadata);
+    const streamClient = this.client as unknown as ShippingServiceStreamClient;
+
+    return this.streamAggregate(
+      () => streamClient.watchShipment(req, md, {}),
+      (chunks) => {
+        return {
+          events: chunks,
+          context: req.context
+        };
+      }
+    );
+  }
+
+  /** Build request from params (base + child) */
+  watchShipmentWithParams(
+    params: WatchShipmentParams,
+    metadata?: grpc.Metadata
+  ): Promise<WatchShipmentResponse> {
+    const req = buildWatchShipmentRequest(params) as unknown as WatchShipmentRequest;
+    return this.watchShipment(req, metadata);
   }
 }

@@ -8,7 +8,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "test-results/**", "src/gen/**", "eslint.config.js"]
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "test-results/**",
+      "allure-results/**",
+      "allure-report/**",
+      "src/gen/**",
+      "eslint.config.js"
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -29,10 +37,7 @@ export default [
     files: ["**/*.{ts,tsx}"],
     rules: {
       // Enforce awaiting/handling all promises (e.g., gRPC calls).
-      "@typescript-eslint/no-floating-promises": [
-        "error",
-        { ignoreVoid: false, ignoreIIFE: false }
-      ],
+      "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: true, ignoreIIFE: false }],
       "@typescript-eslint/await-thenable": "error",
       "@typescript-eslint/return-await": ["error", "always"],
       "@typescript-eslint/no-misused-promises": [
@@ -56,12 +61,10 @@ export default [
     }
   },
   {
-    // Tests can keep their own style (less strict on function declarations).
-    files: ["src/utils/test/**/*.{ts,tsx}", "src/tests/**/*.{ts,tsx}"],
+    // Tests and test-server: allow more conditional flexibility.
+    files: ["src/tests/**/*.{ts,tsx}", "test-server/**/*.{ts,tsx}"],
     rules: {
-      "@typescript-eslint/no-unnecessary-condition": "off",
-      "func-style": "off",
-      "no-restricted-syntax": "off"
+      "@typescript-eslint/no-unnecessary-condition": "off"
     }
   }
 ];

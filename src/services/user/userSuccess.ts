@@ -1,60 +1,70 @@
 import type { GetUserResponse, SearchUsersResponse } from "@gen/acme/user/v1/user_service";
-import { asResponses, verifySuccessContext, type SuccessOneOrMany } from "../baseSuccess";
-
-export type VerifyGetUserSuccessOptions = {
-  expectedRequestId?: string;
-  expectedUserId?: string;
-  expectedEmail?: string;
-  expectedIsActive?: boolean;
-  expectedRolesContain?: string;
-};
+import { expect } from "vitest";
+import type {
+  SuccessOneOrMany,
+  VerifyGetUserSuccessOptions,
+  VerifySearchUsersStreamSuccessOptions,
+  VerifySearchUsersSuccessOptions
+} from "@services/types";
+import { asResponses, verifySuccessContext } from "@services/base";
 
 export const verifyGetUserSuccess = (
   res: SuccessOneOrMany<GetUserResponse>,
   options?: VerifyGetUserSuccessOptions
 ): void => {
+  const o: VerifyGetUserSuccessOptions = {
+    expectedEmail: "user@example.com",
+    expectedIsActive: true,
+    expectedRolesContain: "USER",
+    ...options
+  };
   asResponses(res).forEach((r) => {
-    verifySuccessContext(r.context, { expectedRequestId: options?.expectedRequestId });
-    if (options?.expectedUserId !== undefined) {
-      expect(r.user?.userId).toBe(options.expectedUserId);
+    verifySuccessContext(r.context, { expectedRequestId: o.expectedRequestId });
+    expect(r.user).toBeDefined();
+    if (o.expectedUserId !== undefined) {
+      expect(r.user?.userId).toBe(o.expectedUserId);
     }
-    if (options?.expectedEmail !== undefined) {
-      expect(r.user?.email).toBe(options.expectedEmail);
+    if (o.expectedEmail !== undefined) {
+      expect(r.user?.email).toBe(o.expectedEmail);
     }
-    if (options?.expectedIsActive !== undefined) {
-      expect(r.user?.isActive).toBe(options.expectedIsActive);
+    if (o.expectedIsActive !== undefined) {
+      expect(r.user?.isActive).toBe(o.expectedIsActive);
     }
-    if (options?.expectedRolesContain !== undefined) {
-      expect(r.user?.roles).toContain(options.expectedRolesContain);
+    if (o.expectedRolesContain !== undefined) {
+      expect(r.user?.roles).toContain(o.expectedRolesContain);
     }
   });
-};
-
-export type VerifySearchUsersSuccessOptions = {
-  expectedRequestId?: string;
-  expectedMinCount?: number;
-  expectedCount?: number;
-  expectAllActive?: boolean;
-  expectSomeInactive?: boolean;
 };
 
 export const verifySearchUsersSuccess = (
   res: SuccessOneOrMany<SearchUsersResponse>,
   options?: VerifySearchUsersSuccessOptions
 ): void => {
+  const o: VerifySearchUsersSuccessOptions = {
+    expectedMinCount: 1,
+    expectAllActive: true,
+    ...options
+  };
   asResponses(res).forEach((r) => {
-    verifySuccessContext(r.context, { expectedRequestId: options?.expectedRequestId });
-    if (options?.expectedMinCount !== undefined) {
-      expect(r.users.length).toBeGreaterThanOrEqual(options.expectedMinCount);
+    verifySuccessContext(r.context, { expectedRequestId: o.expectedRequestId });
+    if (o.expectedMinCount !== undefined) {
+      expect(r.users.length).toBeGreaterThanOrEqual(o.expectedMinCount);
     }
-    if (options?.expectedCount !== undefined) {
-      expect(r.users.length).toBe(options.expectedCount);
+    if (o.expectedCount !== undefined) {
+      expect(r.users.length).toBe(o.expectedCount);
     }
-    if (options?.expectAllActive === true && r.users.length > 0) {
+    if (o.expectAllActive === true && r.users.length > 0) {
       expect(r.users.every((u) => u.isActive)).toBe(true);
     }
-    if (options?.expectSomeInactive === true) {
+    if (o.expectSomeInactive === true) {
       expect(r.users.some((u) => u.isActive === false)).toBe(true);
     }
   });
+};
+
+export const verifySearchUsersStreamSuccess = (
+  res: SearchUsersResponse,
+  options?: VerifySearchUsersStreamSuccessOptions
+): void => {
+  verifySearchUsersSuccess(res, options);
 };

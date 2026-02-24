@@ -7,20 +7,51 @@ import "acme/common/v1/common.proto";
 service PaymentService {
   rpc Authorize(AuthorizePaymentRequest) returns (AuthorizePaymentResponse);
   rpc Capture(CapturePaymentRequest) returns (CapturePaymentResponse);
+  rpc WatchPayment(WatchPaymentRequest) returns (stream PaymentEvent);
+}
+
+enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0;
+  PAYMENT_STATUS_AUTHORIZED = 1;
+  PAYMENT_STATUS_CAPTURED = 2;
+  PAYMENT_STATUS_DECLINED = 3;
+  PAYMENT_STATUS_FAILED = 4;
+}
+
+enum PaymentMethodType {
+  PAYMENT_METHOD_TYPE_UNSPECIFIED = 0;
+  PAYMENT_METHOD_TYPE_CARD = 1;
+  PAYMENT_METHOD_TYPE_BANK_TRANSFER = 2;
+}
+
+enum CardBrand {
+  CARD_BRAND_UNSPECIFIED = 0;
+  CARD_BRAND_VISA = 1;
+  CARD_BRAND_MASTERCARD = 2;
+  CARD_BRAND_AMEX = 3;
 }
 
 message CardDetails {
   string pan_last4 = 1;
-  string brand = 2;
+  // Prefer card_brand; kept for backwards compatibility.
+  string brand = 2 [deprecated = true];
   int32 exp_month = 3;
   int32 exp_year = 4;
+
+  optional CardBrand card_brand = 5;
+  optional string cardholder_name = 6;
+  reserved 7 to 10;
 }
 
 message PaymentMethod {
   string method_id = 1;
-  string type = 2;
+  // Prefer method_type; kept for backwards compatibility.
+  string type = 2 [deprecated = true];
   CardDetails card = 3;
   map<string, string> attributes = 4;
+
+  optional PaymentMethodType method_type = 5;
+  reserved 6 to 9;
 }
 
 message AuthorizePaymentRequest {
@@ -36,10 +67,14 @@ message AuthorizePaymentRequest {
 
 message AuthorizePaymentResponse {
   string payment_id = 1;
-  string status = 2;
+  // Prefer status_code; kept for backwards compatibility.
+  string status = 2 [deprecated = true];
   string auth_code = 3;
   map<string, string> metadata = 4;
   acme.common.v1.RequestContext context = 5;
+
+  optional PaymentStatus status_code = 6;
+  reserved 7 to 9;
 }
 
 message CapturePaymentRequest {
@@ -47,13 +82,41 @@ message CapturePaymentRequest {
   acme.common.v1.Money amount = 2;
   acme.common.v1.RequestContext context = 3;
   map<string, string> headers = 4;
+
+  acme.common.v1.Actor actor = 5;
+  reserved 6;
 }
 
 message CapturePaymentResponse {
   string payment_id = 1;
-  string status = 2;
+  // Prefer status_code; kept for backwards compatibility.
+  string status = 2 [deprecated = true];
   string capture_id = 3;
   map<string, string> metadata = 4;
   acme.common.v1.RequestContext context = 5;
+
+  optional PaymentStatus status_code = 6;
+  reserved 7;
+}
+
+message WatchPaymentRequest {
+  string payment_id = 1;
+  acme.common.v1.RequestContext context = 2;
+  acme.common.v1.Actor actor = 3;
+  map<string, string> headers = 4;
+
+  // Optional: start streaming events after this index (simple resume).
+  optional int64 after_event_index = 5;
+}
+
+message PaymentEvent {
+  string payment_id = 1;
+  PaymentStatus status_code = 2;
+  string message = 3;
+  map<string, string> metadata = 4;
+  acme.common.v1.RequestContext context = 5;
+
+  int64 event_index = 6;
+  reserved 7 to 9;
 }
 

@@ -10,12 +10,14 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test-server": "bun test-server/index.ts",
     "test": "vitest run",
+    "test:watch": "vitest",
+    "allure:clean": "rm -rf allure-results allure-report test-results",
     "allure:serve": "bunx allure serve allure-results",
     "allure:generate": "bunx allure generate --clean allure-results -o allure-report",
-    "allure:open": "bunx allure open allure-report",
-    "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "allure:open": "bunx allure open allure-report"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",

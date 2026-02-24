@@ -11,7 +11,9 @@ import {
   type ChannelCredentials,
   Client,
   type ClientOptions,
+  type ClientReadableStream,
   type ClientUnaryCall,
+  type handleServerStreamingCall,
   type handleUnaryCall,
   makeGenericClientConstructor,
   type Metadata,
@@ -22,18 +24,166 @@ import { Actor, Money, RequestContext } from "../../common/v1/common";
 
 export const protobufPackage = "acme.payment.v1";
 
+export enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0,
+  PAYMENT_STATUS_AUTHORIZED = 1,
+  PAYMENT_STATUS_CAPTURED = 2,
+  PAYMENT_STATUS_DECLINED = 3,
+  PAYMENT_STATUS_FAILED = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function paymentStatusFromJSON(object: any): PaymentStatus {
+  switch (object) {
+    case 0:
+    case "PAYMENT_STATUS_UNSPECIFIED":
+      return PaymentStatus.PAYMENT_STATUS_UNSPECIFIED;
+    case 1:
+    case "PAYMENT_STATUS_AUTHORIZED":
+      return PaymentStatus.PAYMENT_STATUS_AUTHORIZED;
+    case 2:
+    case "PAYMENT_STATUS_CAPTURED":
+      return PaymentStatus.PAYMENT_STATUS_CAPTURED;
+    case 3:
+    case "PAYMENT_STATUS_DECLINED":
+      return PaymentStatus.PAYMENT_STATUS_DECLINED;
+    case 4:
+    case "PAYMENT_STATUS_FAILED":
+      return PaymentStatus.PAYMENT_STATUS_FAILED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return PaymentStatus.UNRECOGNIZED;
+  }
+}
+
+export function paymentStatusToJSON(object: PaymentStatus): string {
+  switch (object) {
+    case PaymentStatus.PAYMENT_STATUS_UNSPECIFIED:
+      return "PAYMENT_STATUS_UNSPECIFIED";
+    case PaymentStatus.PAYMENT_STATUS_AUTHORIZED:
+      return "PAYMENT_STATUS_AUTHORIZED";
+    case PaymentStatus.PAYMENT_STATUS_CAPTURED:
+      return "PAYMENT_STATUS_CAPTURED";
+    case PaymentStatus.PAYMENT_STATUS_DECLINED:
+      return "PAYMENT_STATUS_DECLINED";
+    case PaymentStatus.PAYMENT_STATUS_FAILED:
+      return "PAYMENT_STATUS_FAILED";
+    case PaymentStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum PaymentMethodType {
+  PAYMENT_METHOD_TYPE_UNSPECIFIED = 0,
+  PAYMENT_METHOD_TYPE_CARD = 1,
+  PAYMENT_METHOD_TYPE_BANK_TRANSFER = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function paymentMethodTypeFromJSON(object: any): PaymentMethodType {
+  switch (object) {
+    case 0:
+    case "PAYMENT_METHOD_TYPE_UNSPECIFIED":
+      return PaymentMethodType.PAYMENT_METHOD_TYPE_UNSPECIFIED;
+    case 1:
+    case "PAYMENT_METHOD_TYPE_CARD":
+      return PaymentMethodType.PAYMENT_METHOD_TYPE_CARD;
+    case 2:
+    case "PAYMENT_METHOD_TYPE_BANK_TRANSFER":
+      return PaymentMethodType.PAYMENT_METHOD_TYPE_BANK_TRANSFER;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return PaymentMethodType.UNRECOGNIZED;
+  }
+}
+
+export function paymentMethodTypeToJSON(object: PaymentMethodType): string {
+  switch (object) {
+    case PaymentMethodType.PAYMENT_METHOD_TYPE_UNSPECIFIED:
+      return "PAYMENT_METHOD_TYPE_UNSPECIFIED";
+    case PaymentMethodType.PAYMENT_METHOD_TYPE_CARD:
+      return "PAYMENT_METHOD_TYPE_CARD";
+    case PaymentMethodType.PAYMENT_METHOD_TYPE_BANK_TRANSFER:
+      return "PAYMENT_METHOD_TYPE_BANK_TRANSFER";
+    case PaymentMethodType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum CardBrand {
+  CARD_BRAND_UNSPECIFIED = 0,
+  CARD_BRAND_VISA = 1,
+  CARD_BRAND_MASTERCARD = 2,
+  CARD_BRAND_AMEX = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function cardBrandFromJSON(object: any): CardBrand {
+  switch (object) {
+    case 0:
+    case "CARD_BRAND_UNSPECIFIED":
+      return CardBrand.CARD_BRAND_UNSPECIFIED;
+    case 1:
+    case "CARD_BRAND_VISA":
+      return CardBrand.CARD_BRAND_VISA;
+    case 2:
+    case "CARD_BRAND_MASTERCARD":
+      return CardBrand.CARD_BRAND_MASTERCARD;
+    case 3:
+    case "CARD_BRAND_AMEX":
+      return CardBrand.CARD_BRAND_AMEX;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return CardBrand.UNRECOGNIZED;
+  }
+}
+
+export function cardBrandToJSON(object: CardBrand): string {
+  switch (object) {
+    case CardBrand.CARD_BRAND_UNSPECIFIED:
+      return "CARD_BRAND_UNSPECIFIED";
+    case CardBrand.CARD_BRAND_VISA:
+      return "CARD_BRAND_VISA";
+    case CardBrand.CARD_BRAND_MASTERCARD:
+      return "CARD_BRAND_MASTERCARD";
+    case CardBrand.CARD_BRAND_AMEX:
+      return "CARD_BRAND_AMEX";
+    case CardBrand.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface CardDetails {
   panLast4: string;
+  /**
+   * Prefer card_brand; kept for backwards compatibility.
+   *
+   * @deprecated
+   */
   brand: string;
   expMonth: number;
   expYear: number;
+  cardBrand?: CardBrand | undefined;
+  cardholderName?: string | undefined;
 }
 
 export interface PaymentMethod {
   methodId: string;
+  /**
+   * Prefer method_type; kept for backwards compatibility.
+   *
+   * @deprecated
+   */
   type: string;
   card?: CardDetails | undefined;
   attributes: { [key: string]: string };
+  methodType?: PaymentMethodType | undefined;
 }
 
 export interface PaymentMethod_AttributesEntry {
@@ -59,10 +209,16 @@ export interface AuthorizePaymentRequest_HeadersEntry {
 
 export interface AuthorizePaymentResponse {
   paymentId: string;
+  /**
+   * Prefer status_code; kept for backwards compatibility.
+   *
+   * @deprecated
+   */
   status: string;
   authCode: string;
   metadata: { [key: string]: string };
   context?: RequestContext | undefined;
+  statusCode?: PaymentStatus | undefined;
 }
 
 export interface AuthorizePaymentResponse_MetadataEntry {
@@ -75,6 +231,7 @@ export interface CapturePaymentRequest {
   amount?: Money | undefined;
   context?: RequestContext | undefined;
   headers: { [key: string]: string };
+  actor?: Actor | undefined;
 }
 
 export interface CapturePaymentRequest_HeadersEntry {
@@ -84,10 +241,16 @@ export interface CapturePaymentRequest_HeadersEntry {
 
 export interface CapturePaymentResponse {
   paymentId: string;
+  /**
+   * Prefer status_code; kept for backwards compatibility.
+   *
+   * @deprecated
+   */
   status: string;
   captureId: string;
   metadata: { [key: string]: string };
   context?: RequestContext | undefined;
+  statusCode?: PaymentStatus | undefined;
 }
 
 export interface CapturePaymentResponse_MetadataEntry {
@@ -95,8 +258,36 @@ export interface CapturePaymentResponse_MetadataEntry {
   value: string;
 }
 
+export interface WatchPaymentRequest {
+  paymentId: string;
+  context?: RequestContext | undefined;
+  actor?: Actor | undefined;
+  headers: { [key: string]: string };
+  /** Optional: start streaming events after this index (simple resume). */
+  afterEventIndex?: number | undefined;
+}
+
+export interface WatchPaymentRequest_HeadersEntry {
+  key: string;
+  value: string;
+}
+
+export interface PaymentEvent {
+  paymentId: string;
+  statusCode: PaymentStatus;
+  message: string;
+  metadata: { [key: string]: string };
+  context?: RequestContext | undefined;
+  eventIndex: number;
+}
+
+export interface PaymentEvent_MetadataEntry {
+  key: string;
+  value: string;
+}
+
 function createBaseCardDetails(): CardDetails {
-  return { panLast4: "", brand: "", expMonth: 0, expYear: 0 };
+  return { panLast4: "", brand: "", expMonth: 0, expYear: 0, cardBrand: undefined, cardholderName: undefined };
 }
 
 export const CardDetails: MessageFns<CardDetails> = {
@@ -112,6 +303,12 @@ export const CardDetails: MessageFns<CardDetails> = {
     }
     if (message.expYear !== 0) {
       writer.uint32(32).int32(message.expYear);
+    }
+    if (message.cardBrand !== undefined) {
+      writer.uint32(40).int32(message.cardBrand);
+    }
+    if (message.cardholderName !== undefined) {
+      writer.uint32(50).string(message.cardholderName);
     }
     return writer;
   },
@@ -155,6 +352,22 @@ export const CardDetails: MessageFns<CardDetails> = {
           message.expYear = reader.int32();
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.cardBrand = reader.int32() as any;
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.cardholderName = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -182,6 +395,16 @@ export const CardDetails: MessageFns<CardDetails> = {
         : isSet(object.exp_year)
         ? globalThis.Number(object.exp_year)
         : 0,
+      cardBrand: isSet(object.cardBrand)
+        ? cardBrandFromJSON(object.cardBrand)
+        : isSet(object.card_brand)
+        ? cardBrandFromJSON(object.card_brand)
+        : undefined,
+      cardholderName: isSet(object.cardholderName)
+        ? globalThis.String(object.cardholderName)
+        : isSet(object.cardholder_name)
+        ? globalThis.String(object.cardholder_name)
+        : undefined,
     };
   },
 
@@ -199,6 +422,12 @@ export const CardDetails: MessageFns<CardDetails> = {
     if (message.expYear !== 0) {
       obj.expYear = Math.round(message.expYear);
     }
+    if (message.cardBrand !== undefined) {
+      obj.cardBrand = cardBrandToJSON(message.cardBrand);
+    }
+    if (message.cardholderName !== undefined) {
+      obj.cardholderName = message.cardholderName;
+    }
     return obj;
   },
 
@@ -211,12 +440,14 @@ export const CardDetails: MessageFns<CardDetails> = {
     message.brand = object.brand ?? "";
     message.expMonth = object.expMonth ?? 0;
     message.expYear = object.expYear ?? 0;
+    message.cardBrand = object.cardBrand ?? undefined;
+    message.cardholderName = object.cardholderName ?? undefined;
     return message;
   },
 };
 
 function createBasePaymentMethod(): PaymentMethod {
-  return { methodId: "", type: "", card: undefined, attributes: {} };
+  return { methodId: "", type: "", card: undefined, attributes: {}, methodType: undefined };
 }
 
 export const PaymentMethod: MessageFns<PaymentMethod> = {
@@ -233,6 +464,9 @@ export const PaymentMethod: MessageFns<PaymentMethod> = {
     globalThis.Object.entries(message.attributes).forEach(([key, value]: [string, string]) => {
       PaymentMethod_AttributesEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
     });
+    if (message.methodType !== undefined) {
+      writer.uint32(40).int32(message.methodType);
+    }
     return writer;
   },
 
@@ -278,6 +512,14 @@ export const PaymentMethod: MessageFns<PaymentMethod> = {
           }
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.methodType = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -305,6 +547,11 @@ export const PaymentMethod: MessageFns<PaymentMethod> = {
           {},
         )
         : {},
+      methodType: isSet(object.methodType)
+        ? paymentMethodTypeFromJSON(object.methodType)
+        : isSet(object.method_type)
+        ? paymentMethodTypeFromJSON(object.method_type)
+        : undefined,
     };
   },
 
@@ -328,6 +575,9 @@ export const PaymentMethod: MessageFns<PaymentMethod> = {
         });
       }
     }
+    if (message.methodType !== undefined) {
+      obj.methodType = paymentMethodTypeToJSON(message.methodType);
+    }
     return obj;
   },
 
@@ -350,6 +600,7 @@ export const PaymentMethod: MessageFns<PaymentMethod> = {
       },
       {},
     );
+    message.methodType = object.methodType ?? undefined;
     return message;
   },
 };
@@ -737,7 +988,7 @@ export const AuthorizePaymentRequest_HeadersEntry: MessageFns<AuthorizePaymentRe
 };
 
 function createBaseAuthorizePaymentResponse(): AuthorizePaymentResponse {
-  return { paymentId: "", status: "", authCode: "", metadata: {}, context: undefined };
+  return { paymentId: "", status: "", authCode: "", metadata: {}, context: undefined, statusCode: undefined };
 }
 
 export const AuthorizePaymentResponse: MessageFns<AuthorizePaymentResponse> = {
@@ -756,6 +1007,9 @@ export const AuthorizePaymentResponse: MessageFns<AuthorizePaymentResponse> = {
     });
     if (message.context !== undefined) {
       RequestContext.encode(message.context, writer.uint32(42).fork()).join();
+    }
+    if (message.statusCode !== undefined) {
+      writer.uint32(48).int32(message.statusCode);
     }
     return writer;
   },
@@ -810,6 +1064,14 @@ export const AuthorizePaymentResponse: MessageFns<AuthorizePaymentResponse> = {
           message.context = RequestContext.decode(reader, reader.uint32());
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.statusCode = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -842,6 +1104,11 @@ export const AuthorizePaymentResponse: MessageFns<AuthorizePaymentResponse> = {
         )
         : {},
       context: isSet(object.context) ? RequestContext.fromJSON(object.context) : undefined,
+      statusCode: isSet(object.statusCode)
+        ? paymentStatusFromJSON(object.statusCode)
+        : isSet(object.status_code)
+        ? paymentStatusFromJSON(object.status_code)
+        : undefined,
     };
   },
 
@@ -868,6 +1135,9 @@ export const AuthorizePaymentResponse: MessageFns<AuthorizePaymentResponse> = {
     if (message.context !== undefined) {
       obj.context = RequestContext.toJSON(message.context);
     }
+    if (message.statusCode !== undefined) {
+      obj.statusCode = paymentStatusToJSON(message.statusCode);
+    }
     return obj;
   },
 
@@ -891,6 +1161,7 @@ export const AuthorizePaymentResponse: MessageFns<AuthorizePaymentResponse> = {
     message.context = (object.context !== undefined && object.context !== null)
       ? RequestContext.fromPartial(object.context)
       : undefined;
+    message.statusCode = object.statusCode ?? undefined;
     return message;
   },
 };
@@ -976,7 +1247,7 @@ export const AuthorizePaymentResponse_MetadataEntry: MessageFns<AuthorizePayment
 };
 
 function createBaseCapturePaymentRequest(): CapturePaymentRequest {
-  return { paymentId: "", amount: undefined, context: undefined, headers: {} };
+  return { paymentId: "", amount: undefined, context: undefined, headers: {}, actor: undefined };
 }
 
 export const CapturePaymentRequest: MessageFns<CapturePaymentRequest> = {
@@ -993,6 +1264,9 @@ export const CapturePaymentRequest: MessageFns<CapturePaymentRequest> = {
     globalThis.Object.entries(message.headers).forEach(([key, value]: [string, string]) => {
       CapturePaymentRequest_HeadersEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
     });
+    if (message.actor !== undefined) {
+      Actor.encode(message.actor, writer.uint32(42).fork()).join();
+    }
     return writer;
   },
 
@@ -1038,6 +1312,14 @@ export const CapturePaymentRequest: MessageFns<CapturePaymentRequest> = {
           }
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.actor = Actor.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1065,6 +1347,7 @@ export const CapturePaymentRequest: MessageFns<CapturePaymentRequest> = {
           {},
         )
         : {},
+      actor: isSet(object.actor) ? Actor.fromJSON(object.actor) : undefined,
     };
   },
 
@@ -1087,6 +1370,9 @@ export const CapturePaymentRequest: MessageFns<CapturePaymentRequest> = {
           obj.headers[k] = v;
         });
       }
+    }
+    if (message.actor !== undefined) {
+      obj.actor = Actor.toJSON(message.actor);
     }
     return obj;
   },
@@ -1112,6 +1398,7 @@ export const CapturePaymentRequest: MessageFns<CapturePaymentRequest> = {
       },
       {},
     );
+    message.actor = (object.actor !== undefined && object.actor !== null) ? Actor.fromPartial(object.actor) : undefined;
     return message;
   },
 };
@@ -1197,7 +1484,7 @@ export const CapturePaymentRequest_HeadersEntry: MessageFns<CapturePaymentReques
 };
 
 function createBaseCapturePaymentResponse(): CapturePaymentResponse {
-  return { paymentId: "", status: "", captureId: "", metadata: {}, context: undefined };
+  return { paymentId: "", status: "", captureId: "", metadata: {}, context: undefined, statusCode: undefined };
 }
 
 export const CapturePaymentResponse: MessageFns<CapturePaymentResponse> = {
@@ -1216,6 +1503,9 @@ export const CapturePaymentResponse: MessageFns<CapturePaymentResponse> = {
     });
     if (message.context !== undefined) {
       RequestContext.encode(message.context, writer.uint32(42).fork()).join();
+    }
+    if (message.statusCode !== undefined) {
+      writer.uint32(48).int32(message.statusCode);
     }
     return writer;
   },
@@ -1270,6 +1560,14 @@ export const CapturePaymentResponse: MessageFns<CapturePaymentResponse> = {
           message.context = RequestContext.decode(reader, reader.uint32());
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.statusCode = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1302,6 +1600,11 @@ export const CapturePaymentResponse: MessageFns<CapturePaymentResponse> = {
         )
         : {},
       context: isSet(object.context) ? RequestContext.fromJSON(object.context) : undefined,
+      statusCode: isSet(object.statusCode)
+        ? paymentStatusFromJSON(object.statusCode)
+        : isSet(object.status_code)
+        ? paymentStatusFromJSON(object.status_code)
+        : undefined,
     };
   },
 
@@ -1328,6 +1631,9 @@ export const CapturePaymentResponse: MessageFns<CapturePaymentResponse> = {
     if (message.context !== undefined) {
       obj.context = RequestContext.toJSON(message.context);
     }
+    if (message.statusCode !== undefined) {
+      obj.statusCode = paymentStatusToJSON(message.statusCode);
+    }
     return obj;
   },
 
@@ -1351,6 +1657,7 @@ export const CapturePaymentResponse: MessageFns<CapturePaymentResponse> = {
     message.context = (object.context !== undefined && object.context !== null)
       ? RequestContext.fromPartial(object.context)
       : undefined;
+    message.statusCode = object.statusCode ?? undefined;
     return message;
   },
 };
@@ -1435,6 +1742,500 @@ export const CapturePaymentResponse_MetadataEntry: MessageFns<CapturePaymentResp
   },
 };
 
+function createBaseWatchPaymentRequest(): WatchPaymentRequest {
+  return { paymentId: "", context: undefined, actor: undefined, headers: {}, afterEventIndex: undefined };
+}
+
+export const WatchPaymentRequest: MessageFns<WatchPaymentRequest> = {
+  encode(message: WatchPaymentRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.paymentId !== "") {
+      writer.uint32(10).string(message.paymentId);
+    }
+    if (message.context !== undefined) {
+      RequestContext.encode(message.context, writer.uint32(18).fork()).join();
+    }
+    if (message.actor !== undefined) {
+      Actor.encode(message.actor, writer.uint32(26).fork()).join();
+    }
+    globalThis.Object.entries(message.headers).forEach(([key, value]: [string, string]) => {
+      WatchPaymentRequest_HeadersEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
+    });
+    if (message.afterEventIndex !== undefined) {
+      writer.uint32(40).int64(message.afterEventIndex);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WatchPaymentRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWatchPaymentRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.context = RequestContext.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.actor = Actor.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = WatchPaymentRequest_HeadersEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.headers[entry4.key] = entry4.value;
+          }
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.afterEventIndex = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WatchPaymentRequest {
+    return {
+      paymentId: isSet(object.paymentId)
+        ? globalThis.String(object.paymentId)
+        : isSet(object.payment_id)
+        ? globalThis.String(object.payment_id)
+        : "",
+      context: isSet(object.context) ? RequestContext.fromJSON(object.context) : undefined,
+      actor: isSet(object.actor) ? Actor.fromJSON(object.actor) : undefined,
+      headers: isObject(object.headers)
+        ? (globalThis.Object.entries(object.headers) as [string, any][]).reduce(
+          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
+            acc[key] = globalThis.String(value);
+            return acc;
+          },
+          {},
+        )
+        : {},
+      afterEventIndex: isSet(object.afterEventIndex)
+        ? globalThis.Number(object.afterEventIndex)
+        : isSet(object.after_event_index)
+        ? globalThis.Number(object.after_event_index)
+        : undefined,
+    };
+  },
+
+  toJSON(message: WatchPaymentRequest): unknown {
+    const obj: any = {};
+    if (message.paymentId !== "") {
+      obj.paymentId = message.paymentId;
+    }
+    if (message.context !== undefined) {
+      obj.context = RequestContext.toJSON(message.context);
+    }
+    if (message.actor !== undefined) {
+      obj.actor = Actor.toJSON(message.actor);
+    }
+    if (message.headers) {
+      const entries = globalThis.Object.entries(message.headers) as [string, string][];
+      if (entries.length > 0) {
+        obj.headers = {};
+        entries.forEach(([k, v]) => {
+          obj.headers[k] = v;
+        });
+      }
+    }
+    if (message.afterEventIndex !== undefined) {
+      obj.afterEventIndex = Math.round(message.afterEventIndex);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<WatchPaymentRequest>, I>>(base?: I): WatchPaymentRequest {
+    return WatchPaymentRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<WatchPaymentRequest>, I>>(object: I): WatchPaymentRequest {
+    const message = createBaseWatchPaymentRequest();
+    message.paymentId = object.paymentId ?? "";
+    message.context = (object.context !== undefined && object.context !== null)
+      ? RequestContext.fromPartial(object.context)
+      : undefined;
+    message.actor = (object.actor !== undefined && object.actor !== null) ? Actor.fromPartial(object.actor) : undefined;
+    message.headers = (globalThis.Object.entries(object.headers ?? {}) as [string, string][]).reduce(
+      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
+        if (value !== undefined) {
+          acc[key] = globalThis.String(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    message.afterEventIndex = object.afterEventIndex ?? undefined;
+    return message;
+  },
+};
+
+function createBaseWatchPaymentRequest_HeadersEntry(): WatchPaymentRequest_HeadersEntry {
+  return { key: "", value: "" };
+}
+
+export const WatchPaymentRequest_HeadersEntry: MessageFns<WatchPaymentRequest_HeadersEntry> = {
+  encode(message: WatchPaymentRequest_HeadersEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WatchPaymentRequest_HeadersEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWatchPaymentRequest_HeadersEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WatchPaymentRequest_HeadersEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: WatchPaymentRequest_HeadersEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<WatchPaymentRequest_HeadersEntry>, I>>(
+    base?: I,
+  ): WatchPaymentRequest_HeadersEntry {
+    return WatchPaymentRequest_HeadersEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<WatchPaymentRequest_HeadersEntry>, I>>(
+    object: I,
+  ): WatchPaymentRequest_HeadersEntry {
+    const message = createBaseWatchPaymentRequest_HeadersEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBasePaymentEvent(): PaymentEvent {
+  return { paymentId: "", statusCode: 0, message: "", metadata: {}, context: undefined, eventIndex: 0 };
+}
+
+export const PaymentEvent: MessageFns<PaymentEvent> = {
+  encode(message: PaymentEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.paymentId !== "") {
+      writer.uint32(10).string(message.paymentId);
+    }
+    if (message.statusCode !== 0) {
+      writer.uint32(16).int32(message.statusCode);
+    }
+    if (message.message !== "") {
+      writer.uint32(26).string(message.message);
+    }
+    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
+      PaymentEvent_MetadataEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
+    });
+    if (message.context !== undefined) {
+      RequestContext.encode(message.context, writer.uint32(42).fork()).join();
+    }
+    if (message.eventIndex !== 0) {
+      writer.uint32(48).int64(message.eventIndex);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PaymentEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePaymentEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.statusCode = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.message = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = PaymentEvent_MetadataEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.metadata[entry4.key] = entry4.value;
+          }
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.context = RequestContext.decode(reader, reader.uint32());
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.eventIndex = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PaymentEvent {
+    return {
+      paymentId: isSet(object.paymentId)
+        ? globalThis.String(object.paymentId)
+        : isSet(object.payment_id)
+        ? globalThis.String(object.payment_id)
+        : "",
+      statusCode: isSet(object.statusCode)
+        ? paymentStatusFromJSON(object.statusCode)
+        : isSet(object.status_code)
+        ? paymentStatusFromJSON(object.status_code)
+        : 0,
+      message: isSet(object.message) ? globalThis.String(object.message) : "",
+      metadata: isObject(object.metadata)
+        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
+          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
+            acc[key] = globalThis.String(value);
+            return acc;
+          },
+          {},
+        )
+        : {},
+      context: isSet(object.context) ? RequestContext.fromJSON(object.context) : undefined,
+      eventIndex: isSet(object.eventIndex)
+        ? globalThis.Number(object.eventIndex)
+        : isSet(object.event_index)
+        ? globalThis.Number(object.event_index)
+        : 0,
+    };
+  },
+
+  toJSON(message: PaymentEvent): unknown {
+    const obj: any = {};
+    if (message.paymentId !== "") {
+      obj.paymentId = message.paymentId;
+    }
+    if (message.statusCode !== 0) {
+      obj.statusCode = paymentStatusToJSON(message.statusCode);
+    }
+    if (message.message !== "") {
+      obj.message = message.message;
+    }
+    if (message.metadata) {
+      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    if (message.context !== undefined) {
+      obj.context = RequestContext.toJSON(message.context);
+    }
+    if (message.eventIndex !== 0) {
+      obj.eventIndex = Math.round(message.eventIndex);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PaymentEvent>, I>>(base?: I): PaymentEvent {
+    return PaymentEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PaymentEvent>, I>>(object: I): PaymentEvent {
+    const message = createBasePaymentEvent();
+    message.paymentId = object.paymentId ?? "";
+    message.statusCode = object.statusCode ?? 0;
+    message.message = object.message ?? "";
+    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
+      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
+        if (value !== undefined) {
+          acc[key] = globalThis.String(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    message.context = (object.context !== undefined && object.context !== null)
+      ? RequestContext.fromPartial(object.context)
+      : undefined;
+    message.eventIndex = object.eventIndex ?? 0;
+    return message;
+  },
+};
+
+function createBasePaymentEvent_MetadataEntry(): PaymentEvent_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const PaymentEvent_MetadataEntry: MessageFns<PaymentEvent_MetadataEntry> = {
+  encode(message: PaymentEvent_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PaymentEvent_MetadataEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePaymentEvent_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PaymentEvent_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: PaymentEvent_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PaymentEvent_MetadataEntry>, I>>(base?: I): PaymentEvent_MetadataEntry {
+    return PaymentEvent_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PaymentEvent_MetadataEntry>, I>>(object: I): PaymentEvent_MetadataEntry {
+    const message = createBasePaymentEvent_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
 export type PaymentServiceService = typeof PaymentServiceService;
 export const PaymentServiceService = {
   authorize: {
@@ -1459,11 +2260,21 @@ export const PaymentServiceService = {
       Buffer.from(CapturePaymentResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): CapturePaymentResponse => CapturePaymentResponse.decode(value),
   },
+  watchPayment: {
+    path: "/acme.payment.v1.PaymentService/WatchPayment",
+    requestStream: false,
+    responseStream: true,
+    requestSerialize: (value: WatchPaymentRequest): Buffer => Buffer.from(WatchPaymentRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): WatchPaymentRequest => WatchPaymentRequest.decode(value),
+    responseSerialize: (value: PaymentEvent): Buffer => Buffer.from(PaymentEvent.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PaymentEvent => PaymentEvent.decode(value),
+  },
 } as const;
 
 export interface PaymentServiceServer extends UntypedServiceImplementation {
   authorize: handleUnaryCall<AuthorizePaymentRequest, AuthorizePaymentResponse>;
   capture: handleUnaryCall<CapturePaymentRequest, CapturePaymentResponse>;
+  watchPayment: handleServerStreamingCall<WatchPaymentRequest, PaymentEvent>;
 }
 
 export interface PaymentServiceClient extends Client {
@@ -1497,6 +2308,12 @@ export interface PaymentServiceClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: CapturePaymentResponse) => void,
   ): ClientUnaryCall;
+  watchPayment(request: WatchPaymentRequest, options?: Partial<CallOptions>): ClientReadableStream<PaymentEvent>;
+  watchPayment(
+    request: WatchPaymentRequest,
+    metadata?: Metadata,
+    options?: Partial<CallOptions>,
+  ): ClientReadableStream<PaymentEvent>;
 }
 
 export const PaymentServiceClient = makeGenericClientConstructor(
@@ -1519,6 +2336,17 @@ export type DeepPartial<T> = T extends Builtin ? T
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+
+function longToNumber(int64: { toString(): string }): number {
+  const num = globalThis.Number(int64.toString());
+  if (num > globalThis.Number.MAX_SAFE_INTEGER) {
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+  }
+  if (num < globalThis.Number.MIN_SAFE_INTEGER) {
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+  }
+  return num;
+}
 
 function isObject(value: any): boolean {
   return typeof value === "object" && value !== null;

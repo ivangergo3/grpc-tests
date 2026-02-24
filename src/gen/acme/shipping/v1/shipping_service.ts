@@ -11,7 +11,9 @@ import {
   type ChannelCredentials,
   Client,
   type ClientOptions,
+  type ClientReadableStream,
   type ClientUnaryCall,
+  type handleServerStreamingCall,
   type handleUnaryCall,
   makeGenericClientConstructor,
   type Metadata,
@@ -21,6 +23,102 @@ import {
 import { Actor, Address, RequestContext } from "../../common/v1/common";
 
 export const protobufPackage = "acme.shipping.v1";
+
+export enum ShipmentStatus {
+  SHIPMENT_STATUS_UNSPECIFIED = 0,
+  SHIPMENT_STATUS_CREATED = 1,
+  SHIPMENT_STATUS_IN_TRANSIT = 2,
+  SHIPMENT_STATUS_DELIVERED = 3,
+  SHIPMENT_STATUS_FAILED = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function shipmentStatusFromJSON(object: any): ShipmentStatus {
+  switch (object) {
+    case 0:
+    case "SHIPMENT_STATUS_UNSPECIFIED":
+      return ShipmentStatus.SHIPMENT_STATUS_UNSPECIFIED;
+    case 1:
+    case "SHIPMENT_STATUS_CREATED":
+      return ShipmentStatus.SHIPMENT_STATUS_CREATED;
+    case 2:
+    case "SHIPMENT_STATUS_IN_TRANSIT":
+      return ShipmentStatus.SHIPMENT_STATUS_IN_TRANSIT;
+    case 3:
+    case "SHIPMENT_STATUS_DELIVERED":
+      return ShipmentStatus.SHIPMENT_STATUS_DELIVERED;
+    case 4:
+    case "SHIPMENT_STATUS_FAILED":
+      return ShipmentStatus.SHIPMENT_STATUS_FAILED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ShipmentStatus.UNRECOGNIZED;
+  }
+}
+
+export function shipmentStatusToJSON(object: ShipmentStatus): string {
+  switch (object) {
+    case ShipmentStatus.SHIPMENT_STATUS_UNSPECIFIED:
+      return "SHIPMENT_STATUS_UNSPECIFIED";
+    case ShipmentStatus.SHIPMENT_STATUS_CREATED:
+      return "SHIPMENT_STATUS_CREATED";
+    case ShipmentStatus.SHIPMENT_STATUS_IN_TRANSIT:
+      return "SHIPMENT_STATUS_IN_TRANSIT";
+    case ShipmentStatus.SHIPMENT_STATUS_DELIVERED:
+      return "SHIPMENT_STATUS_DELIVERED";
+    case ShipmentStatus.SHIPMENT_STATUS_FAILED:
+      return "SHIPMENT_STATUS_FAILED";
+    case ShipmentStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum Carrier {
+  CARRIER_UNSPECIFIED = 0,
+  CARRIER_DHL = 1,
+  CARRIER_UPS = 2,
+  CARRIER_FEDEX = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function carrierFromJSON(object: any): Carrier {
+  switch (object) {
+    case 0:
+    case "CARRIER_UNSPECIFIED":
+      return Carrier.CARRIER_UNSPECIFIED;
+    case 1:
+    case "CARRIER_DHL":
+      return Carrier.CARRIER_DHL;
+    case 2:
+    case "CARRIER_UPS":
+      return Carrier.CARRIER_UPS;
+    case 3:
+    case "CARRIER_FEDEX":
+      return Carrier.CARRIER_FEDEX;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return Carrier.UNRECOGNIZED;
+  }
+}
+
+export function carrierToJSON(object: Carrier): string {
+  switch (object) {
+    case Carrier.CARRIER_UNSPECIFIED:
+      return "CARRIER_UNSPECIFIED";
+    case Carrier.CARRIER_DHL:
+      return "CARRIER_DHL";
+    case Carrier.CARRIER_UPS:
+      return "CARRIER_UPS";
+    case Carrier.CARRIER_FEDEX:
+      return "CARRIER_FEDEX";
+    case Carrier.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
 
 export interface ShipmentItem {
   sku: string;
@@ -36,11 +134,23 @@ export interface ShipmentItem_AttributesEntry {
 export interface Shipment {
   shipmentId: string;
   orderId: string;
+  /**
+   * Prefer carrier_code; kept for backwards compatibility.
+   *
+   * @deprecated
+   */
   carrier: string;
+  /**
+   * Prefer status_code; kept for backwards compatibility.
+   *
+   * @deprecated
+   */
   status: string;
   items: ShipmentItem[];
   destination?: Address | undefined;
   metadata: { [key: string]: string };
+  carrierCode?: Carrier | undefined;
+  statusCode?: ShipmentStatus | undefined;
 }
 
 export interface Shipment_MetadataEntry {
@@ -70,10 +180,16 @@ export interface CreateShipmentResponse {
 
 export interface TrackingEvent {
   eventId: string;
+  /**
+   * Prefer timestamp_unix_ms; kept for backwards compatibility.
+   *
+   * @deprecated
+   */
   timestamp: string;
   location: string;
   description: string;
   attributes: { [key: string]: string };
+  timestampUnixMs?: number | undefined;
 }
 
 export interface TrackingEvent_AttributesEntry {
@@ -85,6 +201,7 @@ export interface TrackShipmentRequest {
   shipmentId: string;
   context?: RequestContext | undefined;
   headers: { [key: string]: string };
+  actor?: Actor | undefined;
 }
 
 export interface TrackShipmentRequest_HeadersEntry {
@@ -96,6 +213,20 @@ export interface TrackShipmentResponse {
   shipment?: Shipment | undefined;
   events: TrackingEvent[];
   context?: RequestContext | undefined;
+}
+
+export interface WatchShipmentRequest {
+  shipmentId: string;
+  context?: RequestContext | undefined;
+  actor?: Actor | undefined;
+  headers: { [key: string]: string };
+  /** If set, stream events after this index (simple resume). */
+  afterEventIndex?: number | undefined;
+}
+
+export interface WatchShipmentRequest_HeadersEntry {
+  key: string;
+  value: string;
 }
 
 function createBaseShipmentItem(): ShipmentItem {
@@ -292,7 +423,17 @@ export const ShipmentItem_AttributesEntry: MessageFns<ShipmentItem_AttributesEnt
 };
 
 function createBaseShipment(): Shipment {
-  return { shipmentId: "", orderId: "", carrier: "", status: "", items: [], destination: undefined, metadata: {} };
+  return {
+    shipmentId: "",
+    orderId: "",
+    carrier: "",
+    status: "",
+    items: [],
+    destination: undefined,
+    metadata: {},
+    carrierCode: undefined,
+    statusCode: undefined,
+  };
 }
 
 export const Shipment: MessageFns<Shipment> = {
@@ -318,6 +459,12 @@ export const Shipment: MessageFns<Shipment> = {
     globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
       Shipment_MetadataEntry.encode({ key: key as any, value }, writer.uint32(58).fork()).join();
     });
+    if (message.carrierCode !== undefined) {
+      writer.uint32(64).int32(message.carrierCode);
+    }
+    if (message.statusCode !== undefined) {
+      writer.uint32(72).int32(message.statusCode);
+    }
     return writer;
   },
 
@@ -387,6 +534,22 @@ export const Shipment: MessageFns<Shipment> = {
           }
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.carrierCode = reader.int32() as any;
+          continue;
+        }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.statusCode = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -421,6 +584,16 @@ export const Shipment: MessageFns<Shipment> = {
           {},
         )
         : {},
+      carrierCode: isSet(object.carrierCode)
+        ? carrierFromJSON(object.carrierCode)
+        : isSet(object.carrier_code)
+        ? carrierFromJSON(object.carrier_code)
+        : undefined,
+      statusCode: isSet(object.statusCode)
+        ? shipmentStatusFromJSON(object.statusCode)
+        : isSet(object.status_code)
+        ? shipmentStatusFromJSON(object.status_code)
+        : undefined,
     };
   },
 
@@ -453,6 +626,12 @@ export const Shipment: MessageFns<Shipment> = {
         });
       }
     }
+    if (message.carrierCode !== undefined) {
+      obj.carrierCode = carrierToJSON(message.carrierCode);
+    }
+    if (message.statusCode !== undefined) {
+      obj.statusCode = shipmentStatusToJSON(message.statusCode);
+    }
     return obj;
   },
 
@@ -478,6 +657,8 @@ export const Shipment: MessageFns<Shipment> = {
       },
       {},
     );
+    message.carrierCode = object.carrierCode ?? undefined;
+    message.statusCode = object.statusCode ?? undefined;
     return message;
   },
 };
@@ -920,7 +1101,7 @@ export const CreateShipmentResponse: MessageFns<CreateShipmentResponse> = {
 };
 
 function createBaseTrackingEvent(): TrackingEvent {
-  return { eventId: "", timestamp: "", location: "", description: "", attributes: {} };
+  return { eventId: "", timestamp: "", location: "", description: "", attributes: {}, timestampUnixMs: undefined };
 }
 
 export const TrackingEvent: MessageFns<TrackingEvent> = {
@@ -940,6 +1121,9 @@ export const TrackingEvent: MessageFns<TrackingEvent> = {
     globalThis.Object.entries(message.attributes).forEach(([key, value]: [string, string]) => {
       TrackingEvent_AttributesEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).join();
     });
+    if (message.timestampUnixMs !== undefined) {
+      writer.uint32(48).int64(message.timestampUnixMs);
+    }
     return writer;
   },
 
@@ -993,6 +1177,14 @@ export const TrackingEvent: MessageFns<TrackingEvent> = {
           }
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.timestampUnixMs = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1021,6 +1213,11 @@ export const TrackingEvent: MessageFns<TrackingEvent> = {
           {},
         )
         : {},
+      timestampUnixMs: isSet(object.timestampUnixMs)
+        ? globalThis.Number(object.timestampUnixMs)
+        : isSet(object.timestamp_unix_ms)
+        ? globalThis.Number(object.timestamp_unix_ms)
+        : undefined,
     };
   },
 
@@ -1047,6 +1244,9 @@ export const TrackingEvent: MessageFns<TrackingEvent> = {
         });
       }
     }
+    if (message.timestampUnixMs !== undefined) {
+      obj.timestampUnixMs = Math.round(message.timestampUnixMs);
+    }
     return obj;
   },
 
@@ -1068,6 +1268,7 @@ export const TrackingEvent: MessageFns<TrackingEvent> = {
       },
       {},
     );
+    message.timestampUnixMs = object.timestampUnixMs ?? undefined;
     return message;
   },
 };
@@ -1151,7 +1352,7 @@ export const TrackingEvent_AttributesEntry: MessageFns<TrackingEvent_AttributesE
 };
 
 function createBaseTrackShipmentRequest(): TrackShipmentRequest {
-  return { shipmentId: "", context: undefined, headers: {} };
+  return { shipmentId: "", context: undefined, headers: {}, actor: undefined };
 }
 
 export const TrackShipmentRequest: MessageFns<TrackShipmentRequest> = {
@@ -1165,6 +1366,9 @@ export const TrackShipmentRequest: MessageFns<TrackShipmentRequest> = {
     globalThis.Object.entries(message.headers).forEach(([key, value]: [string, string]) => {
       TrackShipmentRequest_HeadersEntry.encode({ key: key as any, value }, writer.uint32(26).fork()).join();
     });
+    if (message.actor !== undefined) {
+      Actor.encode(message.actor, writer.uint32(34).fork()).join();
+    }
     return writer;
   },
 
@@ -1202,6 +1406,14 @@ export const TrackShipmentRequest: MessageFns<TrackShipmentRequest> = {
           }
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.actor = Actor.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1228,6 +1440,7 @@ export const TrackShipmentRequest: MessageFns<TrackShipmentRequest> = {
           {},
         )
         : {},
+      actor: isSet(object.actor) ? Actor.fromJSON(object.actor) : undefined,
     };
   },
 
@@ -1247,6 +1460,9 @@ export const TrackShipmentRequest: MessageFns<TrackShipmentRequest> = {
           obj.headers[k] = v;
         });
       }
+    }
+    if (message.actor !== undefined) {
+      obj.actor = Actor.toJSON(message.actor);
     }
     return obj;
   },
@@ -1269,6 +1485,7 @@ export const TrackShipmentRequest: MessageFns<TrackShipmentRequest> = {
       },
       {},
     );
+    message.actor = (object.actor !== undefined && object.actor !== null) ? Actor.fromPartial(object.actor) : undefined;
     return message;
   },
 };
@@ -1449,6 +1666,245 @@ export const TrackShipmentResponse: MessageFns<TrackShipmentResponse> = {
   },
 };
 
+function createBaseWatchShipmentRequest(): WatchShipmentRequest {
+  return { shipmentId: "", context: undefined, actor: undefined, headers: {}, afterEventIndex: undefined };
+}
+
+export const WatchShipmentRequest: MessageFns<WatchShipmentRequest> = {
+  encode(message: WatchShipmentRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.shipmentId !== "") {
+      writer.uint32(10).string(message.shipmentId);
+    }
+    if (message.context !== undefined) {
+      RequestContext.encode(message.context, writer.uint32(18).fork()).join();
+    }
+    if (message.actor !== undefined) {
+      Actor.encode(message.actor, writer.uint32(26).fork()).join();
+    }
+    globalThis.Object.entries(message.headers).forEach(([key, value]: [string, string]) => {
+      WatchShipmentRequest_HeadersEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
+    });
+    if (message.afterEventIndex !== undefined) {
+      writer.uint32(40).int64(message.afterEventIndex);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WatchShipmentRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWatchShipmentRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.shipmentId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.context = RequestContext.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.actor = Actor.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = WatchShipmentRequest_HeadersEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.headers[entry4.key] = entry4.value;
+          }
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.afterEventIndex = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WatchShipmentRequest {
+    return {
+      shipmentId: isSet(object.shipmentId)
+        ? globalThis.String(object.shipmentId)
+        : isSet(object.shipment_id)
+        ? globalThis.String(object.shipment_id)
+        : "",
+      context: isSet(object.context) ? RequestContext.fromJSON(object.context) : undefined,
+      actor: isSet(object.actor) ? Actor.fromJSON(object.actor) : undefined,
+      headers: isObject(object.headers)
+        ? (globalThis.Object.entries(object.headers) as [string, any][]).reduce(
+          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
+            acc[key] = globalThis.String(value);
+            return acc;
+          },
+          {},
+        )
+        : {},
+      afterEventIndex: isSet(object.afterEventIndex)
+        ? globalThis.Number(object.afterEventIndex)
+        : isSet(object.after_event_index)
+        ? globalThis.Number(object.after_event_index)
+        : undefined,
+    };
+  },
+
+  toJSON(message: WatchShipmentRequest): unknown {
+    const obj: any = {};
+    if (message.shipmentId !== "") {
+      obj.shipmentId = message.shipmentId;
+    }
+    if (message.context !== undefined) {
+      obj.context = RequestContext.toJSON(message.context);
+    }
+    if (message.actor !== undefined) {
+      obj.actor = Actor.toJSON(message.actor);
+    }
+    if (message.headers) {
+      const entries = globalThis.Object.entries(message.headers) as [string, string][];
+      if (entries.length > 0) {
+        obj.headers = {};
+        entries.forEach(([k, v]) => {
+          obj.headers[k] = v;
+        });
+      }
+    }
+    if (message.afterEventIndex !== undefined) {
+      obj.afterEventIndex = Math.round(message.afterEventIndex);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<WatchShipmentRequest>, I>>(base?: I): WatchShipmentRequest {
+    return WatchShipmentRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<WatchShipmentRequest>, I>>(object: I): WatchShipmentRequest {
+    const message = createBaseWatchShipmentRequest();
+    message.shipmentId = object.shipmentId ?? "";
+    message.context = (object.context !== undefined && object.context !== null)
+      ? RequestContext.fromPartial(object.context)
+      : undefined;
+    message.actor = (object.actor !== undefined && object.actor !== null) ? Actor.fromPartial(object.actor) : undefined;
+    message.headers = (globalThis.Object.entries(object.headers ?? {}) as [string, string][]).reduce(
+      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
+        if (value !== undefined) {
+          acc[key] = globalThis.String(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    message.afterEventIndex = object.afterEventIndex ?? undefined;
+    return message;
+  },
+};
+
+function createBaseWatchShipmentRequest_HeadersEntry(): WatchShipmentRequest_HeadersEntry {
+  return { key: "", value: "" };
+}
+
+export const WatchShipmentRequest_HeadersEntry: MessageFns<WatchShipmentRequest_HeadersEntry> = {
+  encode(message: WatchShipmentRequest_HeadersEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WatchShipmentRequest_HeadersEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWatchShipmentRequest_HeadersEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WatchShipmentRequest_HeadersEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: WatchShipmentRequest_HeadersEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<WatchShipmentRequest_HeadersEntry>, I>>(
+    base?: I,
+  ): WatchShipmentRequest_HeadersEntry {
+    return WatchShipmentRequest_HeadersEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<WatchShipmentRequest_HeadersEntry>, I>>(
+    object: I,
+  ): WatchShipmentRequest_HeadersEntry {
+    const message = createBaseWatchShipmentRequest_HeadersEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
 export type ShippingServiceService = typeof ShippingServiceService;
 export const ShippingServiceService = {
   createShipment: {
@@ -1472,11 +1928,21 @@ export const ShippingServiceService = {
       Buffer.from(TrackShipmentResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): TrackShipmentResponse => TrackShipmentResponse.decode(value),
   },
+  watchShipment: {
+    path: "/acme.shipping.v1.ShippingService/WatchShipment",
+    requestStream: false,
+    responseStream: true,
+    requestSerialize: (value: WatchShipmentRequest): Buffer => Buffer.from(WatchShipmentRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): WatchShipmentRequest => WatchShipmentRequest.decode(value),
+    responseSerialize: (value: TrackingEvent): Buffer => Buffer.from(TrackingEvent.encode(value).finish()),
+    responseDeserialize: (value: Buffer): TrackingEvent => TrackingEvent.decode(value),
+  },
 } as const;
 
 export interface ShippingServiceServer extends UntypedServiceImplementation {
   createShipment: handleUnaryCall<CreateShipmentRequest, CreateShipmentResponse>;
   trackShipment: handleUnaryCall<TrackShipmentRequest, TrackShipmentResponse>;
+  watchShipment: handleServerStreamingCall<WatchShipmentRequest, TrackingEvent>;
 }
 
 export interface ShippingServiceClient extends Client {
@@ -1510,6 +1976,12 @@ export interface ShippingServiceClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: TrackShipmentResponse) => void,
   ): ClientUnaryCall;
+  watchShipment(request: WatchShipmentRequest, options?: Partial<CallOptions>): ClientReadableStream<TrackingEvent>;
+  watchShipment(
+    request: WatchShipmentRequest,
+    metadata?: Metadata,
+    options?: Partial<CallOptions>,
+  ): ClientReadableStream<TrackingEvent>;
 }
 
 export const ShippingServiceClient = makeGenericClientConstructor(
@@ -1532,6 +2004,17 @@ export type DeepPartial<T> = T extends Builtin ? T
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+
+function longToNumber(int64: { toString(): string }): number {
+  const num = globalThis.Number(int64.toString());
+  if (num > globalThis.Number.MAX_SAFE_INTEGER) {
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+  }
+  if (num < globalThis.Number.MIN_SAFE_INTEGER) {
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+  }
+  return num;
+}
 
 function isObject(value: any): boolean {
   return typeof value === "object" && value !== null;

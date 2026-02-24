@@ -4,12 +4,22 @@ package acme.common.v1;
 
 message RequestContext {
   string request_id = 1;
+  // Optional correlation/tracing fields (presence-aware).
+  optional string trace_id = 2;
+  optional string correlation_id = 3;
+
+  reserved 4 to 9;
+  reserved "legacy_trace", "legacy_correlation";
 }
 
 message Actor {
   string subject = 1;
   string tenant = 2;
   repeated string roles = 3;
+
+  // Example of a deprecated field kept for compatibility.
+  optional string user_id = 4 [deprecated = true];
+  reserved 5;
 }
 
 message Address {
@@ -23,7 +33,10 @@ message Address {
 message Money {
   // Decimal as string for simplicity in this demo.
   string amount = 1;
-  string currency = 2;
+  // Prefer currency_code; kept for backwards compatibility.
+  string currency = 2 [deprecated = true];
+  optional CurrencyCode currency_code = 3;
+  reserved 4;
 }
 
 message Pagination {
@@ -35,4 +48,10 @@ message PageInfo {
   string next_page_token = 1;
 }
 
+enum CurrencyCode {
+  CURRENCY_CODE_UNSPECIFIED = 0;
+  CURRENCY_CODE_EUR = 1;
+  CURRENCY_CODE_USD = 2;
+  CURRENCY_CODE_GBP = 3;
+}
 

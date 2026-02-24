@@ -18,11 +18,13 @@ OUT_DIR="$ROOT_DIR/src/gen"
 mkdir -p "$OUT_DIR"
 
 TS_PROTO_PLUGIN="$ROOT_DIR/node_modules/.bin/protoc-gen-ts_proto"
+# If Windows, use the .cmd file instead
 if [ -f "$ROOT_DIR/node_modules/.bin/protoc-gen-ts_proto.cmd" ]; then
   TS_PROTO_PLUGIN="$ROOT_DIR/node_modules/.bin/protoc-gen-ts_proto.cmd"
 fi
 
 PROTOC="$ROOT_DIR/node_modules/.bin/grpc_tools_node_protoc"
+# If Windows, use the .cmd file instead
 if [ -f "$ROOT_DIR/node_modules/.bin/grpc_tools_node_protoc.cmd" ]; then
   PROTOC="$ROOT_DIR/node_modules/.bin/grpc_tools_node_protoc.cmd"
 fi
