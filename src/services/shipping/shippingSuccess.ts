@@ -2,7 +2,6 @@ import type {
   CreateShipmentResponse,
   TrackShipmentResponse
 } from "@gen/acme/shipping/v1/shipping_service";
-import { expect } from "vitest";
 import type {
   SuccessOneOrMany,
   VerifyCreateShipmentSuccessOptions,

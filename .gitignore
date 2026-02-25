@@ -3,7 +3,11 @@ dist/
 coverage/
 test-results/
 allure-results/
+allure-results-api/
+allure-results-ui/
 allure-report/
+playwright-results/
+playwright-report/
 .DS_Store
 .env
 /jenkins/local

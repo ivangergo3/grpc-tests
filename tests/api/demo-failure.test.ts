@@ -1,7 +1,6 @@
 import { describe, it } from "vitest";
 
-import { createLocalServices } from "@utils/fixtures";
-import { verifyAuthorizeSuccess } from "@services/payment";
+import { api, log, verify } from "@utils/fixturesApi";
 
 describe("Demo tests (report/logging examples)", () => {
   it.skip("skipped demo test", () => {
@@ -13,17 +12,18 @@ describe("Demo tests (report/logging examples)", () => {
  * This is intentionally failing so you can see logs and assertion output.
  */
 describe("Demo failing tests (intentionally red)", () => {
-  const api = createLocalServices();
-
   it("fails after a real gRPC call", async () => {
-    api.log.info("demo failing test starting");
+    log.info("demo failing test starting");
     const res = await api.payment.authorizeWithParams({
       paymentId: "demo-pay-1",
       context: { requestId: "demo-req-id" }
     });
-    api.log.info("demo authorize response", res);
+    log.info("demo authorize response", res);
 
     // Intentional failure: stub returns AUTHORIZED
-    verifyAuthorizeSuccess(res, { expectedRequestId: "demo-req-id", expectedStatus: "CAPTURED" });
+    verify.payment.authorizeSuccess(res, {
+      expectedRequestId: "demo-req-id",
+      expectedStatus: "CAPTURED"
+    });
   });
 });

@@ -2,7 +2,6 @@ import type {
   AuthorizePaymentResponse,
   CapturePaymentResponse
 } from "@gen/acme/payment/v1/payment_service";
-import { expect } from "vitest";
 import type {
   SuccessOneOrMany,
   VerifyAuthorizeSuccessOptions,

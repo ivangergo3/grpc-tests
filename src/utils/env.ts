@@ -3,6 +3,25 @@ import path from "node:path";
 
 let loaded = false;
 
+export const parseNonNegativeInt = (raw: string | undefined): number | undefined => {
+  if (!raw) return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.floor(n);
+};
+
+export const requireNonNegativeInt = (name: string): number => {
+  const v = parseNonNegativeInt(process.env[name]);
+  if (v === undefined) throw new Error(`Missing required env var: ${name}`);
+  return v;
+};
+
+export const requireNonEmptyString = (name: string): string => {
+  const v = process.env[name]?.trim();
+  if (!v) throw new Error(`Missing required env var: ${name}`);
+  return v;
+};
+
 const parseLine = (line: string): [key: string, value: string] | undefined => {
   const trimmed = line.trim();
   if (trimmed === "" || trimmed.startsWith("#")) return undefined;

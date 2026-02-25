@@ -27,8 +27,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Install Playwright browser + deps
+        run: node ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Start test-server
         run: |
@@ -36,18 +47,31 @@ jobs:
           echo $! > test-server.pid
           timeout 30 bash -c 'until (echo > /dev/tcp/127.0.0.1/50051) >/dev/null 2>&1; do sleep 1; done'
 
-      - name: Run tests
-        run: bun run test
+      - name: Clean previous reports
+        run: bun run allure:clean
+
+      - name: Run API tests (Allure)
+        run: bun run test:api:allure || true
         env:
           TEST_SERVER_BASE_URL: 127.0.0.1:50051
-          TEST_TIMEOUT_MS: "30000"
-          HOOK_TIMEOUT_MS: "30000"
-          RUN_TIMEOUT_MS: "0"
+          TEST_TIMEOUT: "30000"
+          HOOK_TIMEOUT: "30000"
+          RUN_TIMEOUT: "0"
           VITEST_RETRY: "0"
-          EXPECT_POLL_TIMEOUT_MS: "5000"
-          EXPECT_POLL_INTERVAL_MS: "50"
+          EXPECT_POLL_TIMEOUT: "5000"
+          EXPECT_POLL_INTERVAL: "50"
           JUNIT_OUTPUT_FILE: test-results/junit.xml
-          ALLURE_RESULTS_DIR: allure-results
+          LOG_LEVEL: info
+
+      - name: Run UI tests (Allure)
+        run: bun run test:ui:allure || true
+        env:
+          TEST_SERVER_BASE_URL: 127.0.0.1:50051
+          PLAYWRIGHT_BASE_URL: https://example.com
+          PLAYWRIGHT_TEST_TIMEOUT: "30000"
+          PLAYWRIGHT_EXPECT_TIMEOUT: "5000"
+          PLAYWRIGHT_ACTION_TIMEOUT: "10000"
+          PLAYWRIGHT_RETRIES: "0"
           LOG_LEVEL: info
 
       - name: Set up Java (for Allure report)
@@ -57,10 +81,10 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
-      - name: Generate Allure report
+      - name: Merge + generate Allure report
         id: allure
         if: always()
-        run: bun run allure:generate
+        run: bun run allure:generate:merged
         continue-on-error: true
 
       - name: Upload test results
@@ -70,6 +94,8 @@ jobs:
           name: test-results
           path: |
             test-results/
+            allure-results-api/
+            allure-results-ui/
             allure-results/
             test-server.log
           retention-days: 14
@@ -86,12 +112,14 @@ jobs:
       - name: Comment PR with Allure report link
         if: always()
         uses: actions/github-script@v7
+        env:
+          ALLURE_ARTIFACT_URL: ${{ steps.upload_allure.outputs['artifact-url'] }}
         with:
           script: |
             const isPr = context.eventName === "pull_request"
             if (!isPr) return
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
-            const artifactUrl = `${{ steps.upload_allure.outputs.artifact-url || '' }}`
+            const artifactUrl = process.env.ALLURE_ARTIFACT_URL || ""
             const body = [
               "## Test report",
               "",

@@ -1,16 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createLocalServices } from "@utils/fixtures";
+import { api, verify } from "@utils/fixturesApi";
 import { status } from "@grpc/grpc-js";
-import { verifyFailurePromise } from "@services/base";
-import {
-  verifyCreateShipmentSuccess,
-  verifyTrackShipmentSuccess,
-  verifyWatchShipmentSuccess
-} from "@services/shipping";
 
 describe("ShippingService", () => {
-  const api = createLocalServices();
-
   it("CreateShipment returns shipment", async () => {
     // given
     const params = {
@@ -23,7 +15,10 @@ describe("ShippingService", () => {
     const res = await api.shipping.createShipmentWithParams(params);
 
     // then
-    verifyCreateShipmentSuccess(res, { expectedRequestId: "ship-1", expectedShipmentId: "sh-1" });
+    verify.shipping.createShipmentSuccess(res, {
+      expectedRequestId: "ship-1",
+      expectedShipmentId: "sh-1"
+    });
   });
 
   it("TrackShipment returns events", async () => {
@@ -37,7 +32,10 @@ describe("ShippingService", () => {
     const res = await api.shipping.trackShipmentWithParams(params);
 
     // then
-    verifyTrackShipmentSuccess(res, { expectedRequestId: "ship-2", expectedShipmentId: "sh-1" });
+    verify.shipping.trackShipmentSuccess(res, {
+      expectedRequestId: "ship-2",
+      expectedShipmentId: "sh-1"
+    });
   });
 
   it("TrackShipment echoes shipment id", async () => {
@@ -51,7 +49,7 @@ describe("ShippingService", () => {
     const res = await api.shipping.trackShipmentWithParams(params);
 
     // then
-    verifyTrackShipmentSuccess(res, {
+    verify.shipping.trackShipmentSuccess(res, {
       expectedRequestId: "ship-3",
       expectedShipmentId: "sh-xyz",
       expectedEventsMin: 1
@@ -69,7 +67,10 @@ describe("ShippingService", () => {
     const res = await api.shipping.trackShipmentWithParams(params);
 
     // then
-    verifyTrackShipmentSuccess(res, { expectedRequestId: "ship-4", expectedShipmentId: "sh-ctx" });
+    verify.shipping.trackShipmentSuccess(res, {
+      expectedRequestId: "ship-4",
+      expectedShipmentId: "sh-ctx"
+    });
   });
 
   it("WatchShipment returns a stream aggregated into events[]", async () => {
@@ -83,7 +84,7 @@ describe("ShippingService", () => {
     const res = await api.shipping.watchShipmentWithParams(params);
 
     // then
-    verifyWatchShipmentSuccess(res, {
+    verify.shipping.watchShipmentSuccess(res, {
       expectedRequestId: "ship-stream-1",
       expectedCount: 2,
       verifyAllEvents: (events) => {
@@ -104,7 +105,7 @@ describe("ShippingService", () => {
     const res = await api.shipping.watchShipmentWithParams(params);
 
     // then
-    verifyWatchShipmentSuccess(res, {
+    verify.shipping.watchShipmentSuccess(res, {
       expectedRequestId: "ship-stream-2",
       expectedCount: 1,
       verifyAllEvents: (events) => {
@@ -122,10 +123,14 @@ describe("ShippingService", () => {
     };
 
     // when/then
-    await verifyFailurePromise(api.shipping.createShipmentWithParams(params), {
-      expectedCode: status.INVALID_ARGUMENT,
-      messageContains: "invalid shipment_id"
-    }, { label: "shipping.createShipment" });
+    await verify.shipping.failurePromise(
+      api.shipping.createShipmentWithParams(params),
+      {
+        expectedCode: status.INVALID_ARGUMENT,
+        messageContains: "invalid shipment_id"
+      },
+      { label: "shipping.createShipment" }
+    );
   });
 
   it("TrackShipment returns INVALID_ARGUMENT for fail-* ids", async () => {
@@ -136,10 +141,14 @@ describe("ShippingService", () => {
     };
 
     // when/then
-    await verifyFailurePromise(api.shipping.trackShipmentWithParams(params), {
-      expectedCode: status.INVALID_ARGUMENT,
-      messageContains: "invalid shipment_id"
-    }, { label: "shipping.trackShipment" });
+    await verify.shipping.failurePromise(
+      api.shipping.trackShipmentWithParams(params),
+      {
+        expectedCode: status.INVALID_ARGUMENT,
+        messageContains: "invalid shipment_id"
+      },
+      { label: "shipping.trackShipment" }
+    );
   });
 
   it("WatchShipment returns INVALID_ARGUMENT for fail-* ids", async () => {
@@ -150,9 +159,13 @@ describe("ShippingService", () => {
     };
 
     // when/then
-    await verifyFailurePromise(api.shipping.watchShipmentWithParams(params), {
-      expectedCode: status.INVALID_ARGUMENT,
-      messageContains: "invalid shipment_id"
-    }, { label: "shipping.watchShipment" });
+    await verify.shipping.failurePromise(
+      api.shipping.watchShipmentWithParams(params),
+      {
+        expectedCode: status.INVALID_ARGUMENT,
+        messageContains: "invalid shipment_id"
+      },
+      { label: "shipping.watchShipment" }
+    );
   });
 });

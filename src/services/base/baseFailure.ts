@@ -1,5 +1,4 @@
 import type { ServiceError } from "@grpc/grpc-js";
-import { expect } from "vitest";
 import type { FailureOptions, FailurePromiseContext, FailureSnapshot } from "@services/types";
 
 /**

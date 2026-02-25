@@ -15,7 +15,8 @@ export default [
       "allure-results/**",
       "allure-report/**",
       "src/gen/**",
-      "eslint.config.js"
+      "eslint.config.js",
+      "playwright.config.ts"
     ]
   },
   js.configs.recommended,
@@ -28,7 +29,7 @@ export default [
       parserOptions: {
         ecmaVersion: "latest",
         sourceType: "module",
-        projectService: true,
+        project: ["./tsconfig.json"],
         tsconfigRootDir: __dirname
       }
     }
@@ -62,7 +63,7 @@ export default [
   },
   {
     // Tests and test-server: allow more conditional flexibility.
-    files: ["src/tests/**/*.{ts,tsx}", "test-server/**/*.{ts,tsx}"],
+    files: ["test-server/**/*.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-unnecessary-condition": "off"
     }

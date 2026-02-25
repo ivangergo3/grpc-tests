@@ -15,7 +15,7 @@ const toMs = (iso: string | undefined): number | undefined => {
  * - Provides helpers for metadata/deadline and unary promise wrapping
  * - Leaves concrete RPC methods to subclasses (no asserts here; tests own assertions)
  */
-export abstract class BaseGrpcService<TClient> {
+export abstract class BaseGrpcService<TClient extends grpc.Client> {
   protected readonly client: TClient;
   protected readonly target: string;
 
@@ -53,7 +53,7 @@ export abstract class BaseGrpcService<TClient> {
     this.client = new ClientCtor(target, resolvedCreds, merged);
   }
 
-  // TODO: Need to check if we have this implemented in the service
+  // TODO: Need to check if we have this implemented in the service the keep alive ?
   protected defaultGrpcClientOptions(): grpc.ClientOptions {
     return {
       "grpc.keepalive_time_ms": 30_000,
@@ -129,7 +129,7 @@ export abstract class BaseGrpcService<TClient> {
     };
   }
 
-  // TODO: Need to check if we have this implemented in the service
+  // TODO: Need to check if we have this implemented in the service the metadata thing ?
   protected metadata(metadata?: grpc.Metadata): grpc.Metadata {
     return metadata ?? new grpc.Metadata();
   }
@@ -197,5 +197,9 @@ export abstract class BaseGrpcService<TClient> {
 
   protected last<T>(items: T[]): T | undefined {
     return items.length > 0 ? items[items.length - 1] : undefined;
+  }
+
+  close(): void {
+    this.client.close();
   }
 }

@@ -1,17 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createLocalServices } from "@utils/fixtures";
 import { PaymentStatus } from "@gen/acme/payment/v1/payment_service";
 import { status } from "@grpc/grpc-js";
-import { verifyFailurePromise } from "@services/base";
-import {
-  verifyAuthorizeSuccess,
-  verifyCaptureSuccess,
-  verifyWatchPaymentSuccess
-} from "@services/payment";
+import { api, verify } from "@utils/fixturesApi";
 
 describe("PaymentService", () => {
-  const api = createLocalServices();
-
   it("Authorize returns AUTHORIZED status", async () => {
     // given
     const params = {
@@ -23,7 +15,7 @@ describe("PaymentService", () => {
     const res = await api.payment.authorizeWithParams(params);
 
     // then
-    verifyAuthorizeSuccess(res, { expectedRequestId: "pay-1", expectedPaymentId: "p-1" });
+    verify.payment.authorizeSuccess(res, { expectedRequestId: "pay-1", expectedPaymentId: "p-1" });
   });
 
   it("Capture returns CAPTURED status", async () => {
@@ -37,7 +29,7 @@ describe("PaymentService", () => {
     const res = await api.payment.captureWithParams(params);
 
     // then
-    verifyCaptureSuccess(res, { expectedRequestId: "pay-2", expectedPaymentId: "p-1" });
+    verify.payment.captureSuccess(res, { expectedRequestId: "pay-2", expectedPaymentId: "p-1" });
   });
 
   it("Authorize echoes payment id", async () => {
@@ -51,7 +43,10 @@ describe("PaymentService", () => {
     const res = await api.payment.authorizeWithParams(params);
 
     // then
-    verifyAuthorizeSuccess(res, { expectedRequestId: "pay-3", expectedPaymentId: "p-xyz" });
+    verify.payment.authorizeSuccess(res, {
+      expectedRequestId: "pay-3",
+      expectedPaymentId: "p-xyz"
+    });
   });
 
   it("Authorize returns metadata + echoed context", async () => {
@@ -65,7 +60,10 @@ describe("PaymentService", () => {
     const res = await api.payment.authorizeWithParams(params);
 
     // then
-    verifyAuthorizeSuccess(res, { expectedRequestId: "pay-4", expectedPaymentId: "p-meta" });
+    verify.payment.authorizeSuccess(res, {
+      expectedRequestId: "pay-4",
+      expectedPaymentId: "p-meta"
+    });
   });
 
   it("WatchPayment returns a stream aggregated into events[]", async () => {
@@ -79,7 +77,7 @@ describe("PaymentService", () => {
     const res = await api.payment.watchPaymentWithParams(params);
 
     // then
-    verifyWatchPaymentSuccess(res, {
+    verify.payment.watchPaymentSuccess(res, {
       expectedRequestId: "pay-stream-1",
       expectedCount: 2,
       verifyAllEvents: (events) => {
@@ -103,7 +101,7 @@ describe("PaymentService", () => {
     const res = await api.payment.watchPaymentWithParams(params);
 
     // then
-    verifyWatchPaymentSuccess(res, {
+    verify.payment.watchPaymentSuccess(res, {
       expectedRequestId: "pay-stream-2",
       expectedCount: 1,
       verifyAllEvents: (events) => {
@@ -120,10 +118,14 @@ describe("PaymentService", () => {
     };
 
     // when/then
-    await verifyFailurePromise(api.payment.authorizeWithParams(params), {
-      expectedCode: status.INVALID_ARGUMENT,
-      messageContains: "invalid payment_id: fail-pay-1"
-    }, { label: "payment.authorize" });
+    await verify.payment.failurePromise(
+      api.payment.authorizeWithParams(params),
+      {
+        expectedCode: status.INVALID_ARGUMENT,
+        messageContains: "invalid payment_id: fail-pay-1"
+      },
+      { label: "payment.authorize" }
+    );
   });
 
   it("WatchPayment returns INVALID_ARGUMENT for fail-* ids", async () => {
@@ -134,9 +136,13 @@ describe("PaymentService", () => {
     };
 
     // when/then
-    await verifyFailurePromise(api.payment.watchPaymentWithParams(params), {
-      expectedCode: status.INVALID_ARGUMENT,
-      messageContains: "invalid payment_id: fail-pay-stream"
-    }, { label: "payment.watchPayment" });
+    await verify.payment.failurePromise(
+      api.payment.watchPaymentWithParams(params),
+      {
+        expectedCode: status.INVALID_ARGUMENT,
+        messageContains: "invalid payment_id: fail-pay-stream"
+      },
+      { label: "payment.watchPayment" }
+    );
   });
 });

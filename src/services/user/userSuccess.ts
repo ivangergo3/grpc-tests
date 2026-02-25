@@ -1,5 +1,4 @@
 import type { GetUserResponse, SearchUsersResponse } from "@gen/acme/user/v1/user_service";
-import { expect } from "vitest";
 import type {
   SuccessOneOrMany,
   VerifyGetUserSuccessOptions,

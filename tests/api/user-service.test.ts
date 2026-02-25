@@ -1,16 +1,8 @@
 import { describe, it } from "vitest";
-import { createLocalServices } from "@utils/fixtures";
+import { api, verify } from "@utils/fixturesApi";
 import { status } from "@grpc/grpc-js";
-import { verifyFailurePromise } from "@services/base";
-import {
-  verifyGetUserSuccess,
-  verifySearchUsersStreamSuccess,
-  verifySearchUsersSuccess,
-} from "@services/user";
 
 describe("UserService", () => {
-  const api = createLocalServices();
-
   it("responds to GetUser", async () => {
     // given
     const params = {
@@ -24,7 +16,7 @@ describe("UserService", () => {
     const res = await api.user.getUserWithParams(params);
 
     // then
-    verifyGetUserSuccess(res, { expectedUserId: "123", expectedRequestId: "req-1" });
+    verify.user.getUserSuccess(res, { expectedUserId: "123", expectedRequestId: "req-1" });
   });
 
   it("responds to SearchUsers", async () => {
@@ -38,7 +30,7 @@ describe("UserService", () => {
     const res = await api.user.searchUsersWithParams(params);
 
     // then
-    verifySearchUsersSuccess(res, { expectedRequestId: "req-1b" });
+    verify.user.searchUsersSuccess(res, { expectedRequestId: "req-1b" });
   });
 
   it("SearchUsers can return inactive users when activeOnly=false", async () => {
@@ -52,7 +44,7 @@ describe("UserService", () => {
     const res = await api.user.searchUsersWithParams(params);
 
     // then
-    verifySearchUsersSuccess(res, {
+    verify.user.searchUsersSuccess(res, {
       expectedRequestId: "req-1c",
       expectedCount: 2,
       expectAllActive: false,
@@ -71,7 +63,7 @@ describe("UserService", () => {
     const res = await api.user.searchUsersStreamWithParams(params);
 
     // then
-    verifySearchUsersStreamSuccess(res, { expectedRequestId: "req-stream-1" });
+    verify.user.searchUsersStreamSuccess(res, { expectedRequestId: "req-stream-1" });
   });
 
   it("GetUser returns INVALID_ARGUMENT for fail-* ids", async () => {
@@ -82,10 +74,14 @@ describe("UserService", () => {
     };
 
     // when/then
-    await verifyFailurePromise(api.user.getUserWithParams(params), {
-      expectedCode: status.INVALID_ARGUMENT,
-      messageContains: "invalid user_id"
-    }, { label: "user.getUser" });
+    await verify.user.failurePromise(
+      api.user.getUserWithParams(params),
+      {
+        expectedCode: status.INVALID_ARGUMENT,
+        messageContains: "invalid user_id"
+      },
+      { label: "user.getUser" }
+    );
   });
 
   it("SearchUsers returns INVALID_ARGUMENT for fail-* query", async () => {
@@ -96,10 +92,14 @@ describe("UserService", () => {
     };
 
     // when/then
-    await verifyFailurePromise(api.user.searchUsersWithParams(params), {
-      expectedCode: status.INVALID_ARGUMENT,
-      messageContains: "invalid query"
-    }, { label: "user.searchUsers" });
+    await verify.user.failurePromise(
+      api.user.searchUsersWithParams(params),
+      {
+        expectedCode: status.INVALID_ARGUMENT,
+        messageContains: "invalid query"
+      },
+      { label: "user.searchUsers" }
+    );
   });
 
   it("SearchUsersStream returns INVALID_ARGUMENT for fail-* query", async () => {
@@ -110,9 +110,13 @@ describe("UserService", () => {
     };
 
     // when/then
-    await verifyFailurePromise(api.user.searchUsersStreamWithParams(params), {
-      expectedCode: status.INVALID_ARGUMENT,
-      messageContains: "invalid query"
-    }, { label: "user.searchUsersStream" });
+    await verify.user.failurePromise(
+      api.user.searchUsersStreamWithParams(params),
+      {
+        expectedCode: status.INVALID_ARGUMENT,
+        messageContains: "invalid query"
+      },
+      { label: "user.searchUsersStream" }
+    );
   });
 });

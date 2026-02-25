@@ -1,25 +1,13 @@
 import { afterEach, beforeEach } from "vitest";
 import { logger } from "@utils/logger";
 import { attachArtifactsToAllure, getTestArtifacts, recordLog, startTestArtifacts } from "@utils/testArtifacts";
+import { requireNonNegativeInt } from "@utils/env";
 
 const log = logger;
 
 const toError = (reason: unknown): Error => {
   if (reason instanceof Error) return reason;
   return new Error(typeof reason === "string" ? reason : JSON.stringify(reason));
-};
-
-const parseNonNegativeInt = (raw: string | undefined): number | undefined => {
-  if (!raw) return undefined;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) return undefined;
-  return Math.floor(n);
-};
-
-const requireNonNegativeInt = (name: string): number => {
-  const v = parseNonNegativeInt(process.env[name]);
-  if (v === undefined) throw new Error(`Missing required env var: ${name}`);
-  return v;
 };
 
 // Extra safety net: fail hard on anything that slips past awaits/assertions.
@@ -31,7 +19,7 @@ const p = process as typeof process & {
 if (!p.__vitestGlobalHandlersInstalled) {
   p.__vitestGlobalHandlersInstalled = true;
 
-  const runTimeoutMs = requireNonNegativeInt("RUN_TIMEOUT_MS");
+  const runTimeoutMs = requireNonNegativeInt("RUN_TIMEOUT");
   if (runTimeoutMs > 0) {
     const timeout = setTimeout(() => {
       const err = new Error(`Test run exceeded runTimeoutMs=${runTimeoutMs}ms`);
