@@ -41,7 +41,8 @@ export const test = base.extend<{
   req: UiRequest;
   verify: UiVerify;
 }>({
-  api: async (_fixtures, use) => {
+  api: async ({ page }, use) => {
+    void page;
     const api = createLocalServices();
     try {
       await use(api);
@@ -54,13 +55,16 @@ export const test = base.extend<{
   log: async ({ api }, use) => {
     await use(api.log);
   },
-  build: async (_fixtures, use) => {
+  build: async ({ page }, use) => {
+    void page;
     await use(apiBuild);
   },
-  req: async (_fixtures, use) => {
+  req: async ({ page }, use) => {
+    void page;
     await use(apiRequest);
   },
-  verify: async (_fixtures, use) => {
+  verify: async ({ page }, use) => {
+    void page;
     await use(apiVerify);
   },
   pages: async ({ page }, use) => {
