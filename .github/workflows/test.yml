@@ -156,16 +156,29 @@ jobs:
             const body = [
               "## Test report",
               "",
-              `- **Run**: ${runUrl}`,
               summaryLine,
-              artifactUrl ? `- **Allure report artifact**: ${artifactUrl}` : "- **Allure report artifact**: (not generated)",
+              `- **Run**: ${runUrl}`,
+              artifactUrl
+                ? `- **Allure report artifact**: ${artifactUrl}`
+                : "- **Allure report artifact**: (not generated)",
               "",
-              "### View the Allure report locally",
-              "- Download the **allure-report** artifact from the run and open `index.html`.",
-              "- Or generate/serve locally from results:",
-              "  - `bun run allure:local`",
-              "  - `bun run allure:serve`",
-            ].join("\\n")
+              "### View the Allure report (downloaded artifact, no repo needed)",
+              "Download + unzip the **allure-report** artifact, then serve it locally:",
+              "",
+              "```bash",
+              "cd allure-report",
+              "python3 -m http.server 8000",
+              "```",
+              "",
+              "Open `http://localhost:8000`",
+              "",
+              "### Generate it locally (from this repo)",
+              "```bash",
+              "bun run allure:local",
+              "# or",
+              "bun run allure:serve",
+              "```",
+            ].join("\n")
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
