@@ -14,7 +14,12 @@ This repo is a small **gRPC testing framework** + an **external stub server** yo
 - **Service wrappers (ApiObjects)**: `src/services/**`
   - Base: `src/services/base/` (`BaseGrpcService`, verifiers, helpers)
   - Domains: `src/services/{user,payment,shipping}/`
-- **Tests**: `src/tests/**`
+- **Tests**:
+  - API (Vitest): `tests/api/**`
+  - UI (Playwright): `tests/ui/**`
+- **Test fixtures**:
+  - API fixture: `src/utils/fixturesApi.ts` (exports `api`, `log`, `build`, `verify`, etc.)
+  - UI fixture: `src/utils/fixturesUi.ts` (exports Playwright `test`, `expect` + `build`, `verify`, etc.)
 - **External local stub server**: `test-server/` (run separately)
 
 ---
@@ -27,18 +32,30 @@ This repo is a small **gRPC testing framework** + an **external stub server** yo
 bun install
 ```
 
+Install Playwright browser binaries (Chromium):
+
+```bash
+bun run test:ui:install
+```
+
 ### 2) Create your env file
 
 Copy `.env.example` → `.env` and adjust values as needed.
 
-Minimum required for local runs:
+Minimum required for local API runs:
 
 - `TEST_SERVER_BASE_URL`
 - `TEST_TIMEOUT`, `HOOK_TIMEOUT`, `RUN_TIMEOUT`
 - `VITEST_RETRY`
 - `EXPECT_POLL_TIMEOUT`, `EXPECT_POLL_INTERVAL`
 - `JUNIT_OUTPUT_FILE`
-- `ALLURE_RESULTS_DIR`
+
+Minimum required for local UI runs:
+
+- `PLAYWRIGHT_BASE_URL`
+- `PLAYWRIGHT_TEST_TIMEOUT`, `PLAYWRIGHT_EXPECT_TIMEOUT`, `PLAYWRIGHT_ACTION_TIMEOUT`
+- `PLAYWRIGHT_RETRIES`
+- `ALLURE_RESULTS_DIR_UI`
 
 ### 3) Start the local stub server
 
@@ -58,25 +75,39 @@ In terminal B:
 bun run test
 ```
 
+Notes:
+
+- `bun run test` runs **API then UI** and does **not** fail the overall command if either fails (useful for demo / report generation).
+- For strict behavior (CI-style): `bun run test:strict`
+- Run individually:
+  - API: `bun run test:api`
+  - UI: `bun run test:ui`
+
 ---
 
 ## Allure reporting (local)
 
-Allure results are written to `allure-results/`.
+We keep **separate results folders** so API/UI can run independently (or in parallel in CI):
+
+- API results: `allure-results-api/`
+- UI results: `allure-results-ui/`
+- Merged results: `allure-results/`
+- HTML report: `allure-report/`
 
 Typical local flow:
 
 ```bash
-bun run allure:clean
-bun run test
-bun run allure:generate
-bun run allure:open
+bun run allure:local
 ```
 
-Or serve directly from results:
+Or step-by-step:
 
 ```bash
-bun run allure:serve
+bun run allure:clean
+(bun run test:api:allure || true)
+(bun run test:ui:allure || true)
+bun run allure:generate:merged
+bun run allure:open
 ```
 
 ### What gets attached automatically
@@ -106,10 +137,11 @@ Workflow: `.github/workflows/test.yml`
 Behavior:
 
 - starts `test-server` inside the job
-- runs `bun run test`
-- generates `allure-report/` (HTML)
+- installs Playwright Chromium
+- runs API tests (Allure) and UI tests (Allure)
+- merges results and generates `allure-report/` (HTML)
 - uploads artifacts:
-  - `test-results/`, `allure-results/`, `test-server.log`
+  - `test-results/`, `allure-results-api/`, `allure-results-ui/`, `allure-results/`, `test-server.log`
   - `allure-report/`
 - posts a PR comment linking to:
   - the workflow run
@@ -172,7 +204,7 @@ Vitest is configured to run **one worker at a time** (no in-run parallelism). Pa
 
 ### Intentionally failing demo test
 
-`src/tests/demo-failure.test.ts` contains an intentionally failing test to show how failures look in logs/reports.
+`tests/api/demo-failure.test.ts` contains an intentionally failing test to show how failures look in logs/reports.
 
 If you want a fully green run, remove or skip that test file.
 

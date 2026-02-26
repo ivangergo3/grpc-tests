@@ -118,16 +118,67 @@ jobs:
           script: |
             const isPr = context.eventName === "pull_request"
             if (!isPr) return
+            const fs = require("fs");
+            const path = require("path");
+
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             const artifactUrl = process.env.ALLURE_ARTIFACT_URL || ""
+
+            // Summarize test statuses from merged Allure results.
+            // We count only "*-result.json" files (one per test case).
+            const resultsDir = path.join(process.env.GITHUB_WORKSPACE, "allure-results");
+            const counts = { passed: 0, failed: 0, skipped: 0, unknown: 0, total: 0 };
+            try {
+              if (fs.existsSync(resultsDir)) {
+                const files = fs.readdirSync(resultsDir).filter((f) => f.endsWith("-result.json"));
+                for (const f of files) {
+                  const raw = fs.readFileSync(path.join(resultsDir, f), "utf8");
+                  const j = JSON.parse(raw);
+                  const status = String(j.status || "unknown").toLowerCase();
+                  counts.total++;
+                  if (status === "passed") counts.passed++;
+                  else if (status === "skipped") counts.skipped++;
+                  else if (status === "failed" || status === "broken") counts.failed++;
+                  else counts.unknown++;
+                }
+              }
+            } catch (e) {
+              // If parsing fails, keep counts at zero and continue.
+            }
+
+            const summaryLine =
+              counts.total > 0
+                ? `- **Summary**: ${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped` +
+                  (counts.unknown ? `, ${counts.unknown} unknown` : "") +
+                  ` (total ${counts.total})`
+                : `- **Summary**: (no results found in \`allure-results/\`)`;
+
             const body = [
               "## Test report",
               "",
+              summaryLine,
               `- **Run**: ${runUrl}`,
-              artifactUrl ? `- **Allure report artifact**: ${artifactUrl}` : "- **Allure report artifact**: (not generated)",
+              artifactUrl
+                ? `- **Allure report artifact**: ${artifactUrl}`
+                : "- **Allure report artifact**: (not generated)",
               "",
-              "Download the artifact and open `index.html` locally.",
-            ].join("\\n")
+              "### View the Allure report (downloaded artifact, no repo needed)",
+              "Download + unzip the **allure-report** artifact, then serve it locally:",
+              "",
+              "```bash",
+              "cd allure-report",
+              "python3 -m http.server 8000",
+              "```",
+              "",
+              "Open `http://localhost:8000`",
+              "",
+              "### Generate it locally (from this repo)",
+              "```bash",
+              "bun run allure:local",
+              "# or",
+              "bun run allure:serve",
+              "```",
+            ].join("\n")
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
