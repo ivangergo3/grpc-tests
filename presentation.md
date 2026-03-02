@@ -25,14 +25,15 @@ The key idea: **tests stay simple** (Given / When / Then) while the framework ow
 
 - **Protos**: `proto/**`
 - **Generated code (committed)**: `src/gen/**`
-- **Service layer (ApiObjects)**: `src/services/**`
+- **API layer (ApiObjects / Service APIs)**: `src/services/**`
   - base: `src/services/base/**`
   - domains: `src/services/{user,payment,shipping}/**`
+- **UI layer (Page Objects)**: `src/pages/**`
 - **Utilities**: `src/utils/**`
   - `env.ts` (env parsing, dotenv)
   - `fixturesApi.ts` (API test surface: `api`, `build`, `verify`, `log`)
   - `fixturesUi.ts` (UI test surface: Playwright `test`, plus `api/build/verify/log/pages`)
-- **Test server (stub)**: `test-server/**` ( demoing purposes )
+- **Test server (stub)**: `test-server/**` **( demoing purposes )**
 - **Tests**
   - API: `tests/api/**`
   - UI: `tests/ui/**`
@@ -159,18 +160,15 @@ flowchart TB
     T_ui["UI test cases"]
   end
 
-  subgraph Fixtures
+  subgraph Framework["Framework"]
     F_api["fixturesApi.ts"]
     F_ui["fixturesUi.ts"]
-  end
-
-  subgraph Services["ApiObjects"]
-    S_user["user/*"]
-    S_pay["payment/*"]
-    S_ship["shipping/*"]
-    S_base["base/BaseGrpcService"]
-    S_types["types.ts"]
-    S_utils["utils folder"]
+    F_user["user/*"]
+    F_pay["payment/*"]
+    F_ship["shipping/*"]
+    F_base["base/BaseGrpcService"]
+    F_types["types.ts"]
+    F_utils["utils folder"]
   end
 
   subgraph ExternalDeps["External inputs"]
@@ -185,17 +183,17 @@ flowchart TB
 
   T_api --> F_api
   T_ui --> F_ui
-  F_api --> S_user & S_pay & S_ship
-  F_ui --> S_user & S_pay & S_ship
-  S_user --> S_base
-  S_pay --> S_base
-  S_ship --> S_base
-  S_base --> S_types
-  S_user --> G
-  S_pay --> G
-  S_ship --> G
+  F_api --> F_user & F_pay & F_ship
+  F_ui --> F_user & F_pay & F_ship
+  F_user --> F_base
+  F_pay --> F_base
+  F_ship --> F_base
+  F_base --> F_types
+  F_user --> G
+  F_pay --> G
+  F_ship --> G
   G --> GRPC
-  S_base --> S_utils
+  F_base --> F_utils
 ```
 
 ---
@@ -229,20 +227,29 @@ Why this matters:
 
 ---
 
-## 5) Why “service wrappers”?
+## 5) Why Api Objects + Page Objects?
 
-Instead of writing gRPC calls directly in tests:
+Instead of writing raw gRPC calls or raw UI selectors directly in tests:
 
-- We wrap generated clients in typed **ApiObjects**
-- Each wrapper has:
-  - `<rpc>(req)` (typed request)
-  - `<rpc>WithParams(params)` (request-builder path)
+- We wrap generated gRPC clients in typed **Api Objects** (`src/services/**`)
+- We wrap UI flows in **Page Objects** (`src/pages/**`)
+
+Both follow the same idea: tests should read like a spec and hide low-level details.
+
+ApiObjects typically expose:
+
+- `<rpc>(req)` (typed request)
+- `<rpc>WithParams(params)` (request-builder path)
+
+Page Objects typically expose:
+
+- `goto(...)`, `expectLoaded()`, and higher-level user actions for the domain UI
 
 This gives:
 
 - fewer imports in tests
-- consistent metadata handling
-- consistent error handling and reporting hooks
+- consistent patterns across API + UI tests
+- more useful logs and debugging artifacts when things fail
 
 ---
 
@@ -375,7 +382,7 @@ In `.github/workflows/test.yml` the job:
 - installs dependencies **(cached)**
 - installs Playwright (Chromium) **(cached)**
 - starts `test-server` **(as a demo)**
-- runs API tests (Allure) + UI tests (Allure)
+- runs API tests (Allure) + UI tests (Allure) **(parallel)**
 - generates merged Allure report
 - uploads artifacts
 - posts a PR comment with:
@@ -434,7 +441,7 @@ bun run allure:open
 
 ## 15) Roadmap ideas (optional)
 
-- use this as a skeleton for the real framework
+- use this as a skeleton for a real framework
 - add one service at a time with API test
 - introduce UI tests later
 - gradual rolling out
