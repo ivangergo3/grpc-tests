@@ -317,31 +317,48 @@ jobs:
                   ` (total ${counts.total})`
                 : `- **Summary**: (no results found in \`allure-results/\`)`;
 
-            const body = [
-              "## Test report",
+            const summaryBlock =
+              counts.total > 0
+                ? [
+                    "### Summary",
+                    "",
+                    "| Total | Passed | Failed | Skipped | Unknown |",
+                    "| ---: | ---: | ---: | ---: | ---: |",
+                    `| **${counts.total}** | **${counts.passed}** | **${counts.failed}** | **${counts.skipped}** | **${counts.unknown}** |`,
+                  ].join("\n")
+                : ["### Summary", "", "(no results found in `allure-results/`)"].join("\n");
+
+            const linksBlock = [
+              "### Links",
               "",
-              summaryLine,
-              `- **Run**: ${runUrl}`,
+              `- **Run page**: ${runUrl}`,
               artifactUrl
                 ? `- **Allure report artifact**: ${artifactUrl}`
                 : "- **Allure report artifact**: (not generated)",
+            ].join("\n");
+
+            const viewBlock = [
+              "### View the Allure report (downloaded artifact)",
               "",
-              "### View the Allure report (downloaded artifact, no repo needed)",
-              "Download + unzip the **allure-report** artifact, then serve it locally:",
+              "1) Download + unzip the **allure-report** artifact",
+              "2) Serve it locally:",
               "",
               "```bash",
               "cd allure-report",
               "python3 -m http.server 8000",
               "```",
               "",
-              "Open `http://localhost:8000`",
+              "3) Open `http://localhost:8000`",
+            ].join("\n");
+
+            const body = [
+              "## Test report",
               "",
-              "### Generate it locally (from this repo)",
-              "```bash",
-              "bun run allure:local",
-              "# or",
-              "bun run allure:serve",
-              "```",
+              summaryBlock,
+              "",
+              linksBlock,
+              "",
+              viewBlock,
             ].join("\n")
             await github.rest.issues.createComment({
               owner: context.repo.owner,
