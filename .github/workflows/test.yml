@@ -5,11 +5,97 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  discover_api_tests:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Discover API test files
+        id: discover
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(ls -1 tests/api/*.test.ts 2>/dev/null || true)
+          if [ -z "$files" ]; then
+            echo 'matrix=[]' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          json=$(printf '%s\n' $files | jq -R -s -c 'split("\n")[:-1] | map({file: ., id: (.|gsub("/";"_")|gsub("\\."; "_"))})')
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+
+  api:
+    runs-on: ubuntu-latest
+    needs: [discover_api_tests]
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJson(needs.discover_api_tests.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Start test-server
+        run: |
+          bun run test-server > test-server.log 2>&1 &
+          echo $! > test-server.pid
+          timeout 30 bash -c 'until (echo > /dev/tcp/127.0.0.1/50051) >/dev/null 2>&1; do sleep 1; done'
+
+      - name: Clean previous reports
+        run: bun run allure:clean
+
+      - name: Run API tests (Allure)
+        run: bun run test:api:allure -- "${{ matrix.file }}" || true
+        env:
+          TEST_SERVER_BASE_URL: 127.0.0.1:50051
+          TEST_TIMEOUT: "30000"
+          HOOK_TIMEOUT: "30000"
+          RUN_TIMEOUT: "0"
+          VITEST_RETRY: "0"
+          EXPECT_POLL_TIMEOUT: "5000"
+          EXPECT_POLL_INTERVAL: "50"
+          JUNIT_OUTPUT_FILE: test-results/junit-${{ matrix.id }}.xml
+          LOG_LEVEL: info
+
+      - name: Upload API artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-${{ matrix.id }}
+          path: |
+            test-results/
+            allure-results-api/
+            test-server.log
+          retention-days: 14
+
+      - name: Stop test-server
+        if: always()
+        run: |
+          if [ -f test-server.pid ]; then
+            kill "$(cat test-server.pid)" || true
+          fi
+
+  ui:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,21 +136,8 @@ jobs:
       - name: Clean previous reports
         run: bun run allure:clean
 
-      - name: Run API tests (Allure)
-        run: bun run test:api:allure || true
-        env:
-          TEST_SERVER_BASE_URL: 127.0.0.1:50051
-          TEST_TIMEOUT: "30000"
-          HOOK_TIMEOUT: "30000"
-          RUN_TIMEOUT: "0"
-          VITEST_RETRY: "0"
-          EXPECT_POLL_TIMEOUT: "5000"
-          EXPECT_POLL_INTERVAL: "50"
-          JUNIT_OUTPUT_FILE: test-results/junit.xml
-          LOG_LEVEL: info
-
       - name: Run UI tests (Allure)
-        run: bun run test:ui:allure || true
+        run: bun run test:ui:allure -- --workers="${PLAYWRIGHT_WORKERS}" || true
         env:
           TEST_SERVER_BASE_URL: 127.0.0.1:50051
           PLAYWRIGHT_BASE_URL: https://example.com
@@ -72,7 +145,99 @@ jobs:
           PLAYWRIGHT_EXPECT_TIMEOUT: "5000"
           PLAYWRIGHT_ACTION_TIMEOUT: "10000"
           PLAYWRIGHT_RETRIES: "0"
+          PLAYWRIGHT_WORKERS: "1"
           LOG_LEVEL: info
+
+      - name: Upload UI artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-artifacts
+          path: |
+            allure-results-ui/
+            playwright-results/
+            test-server.log
+          retention-days: 14
+
+      - name: Stop test-server
+        if: always()
+        run: |
+          if [ -f test-server.pid ]; then
+            kill "$(cat test-server.pid)" || true
+          fi
+
+  report:
+    runs-on: ubuntu-latest
+    needs: [api, ui]
+    if: always()
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Clean previous reports
+        if: always()
+        run: bun run allure:clean
+
+      - name: Download API artifacts (all shards)
+        if: always()
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: api-*
+          path: artifacts/api
+
+      - name: Collect API results
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p allure-results-api test-results
+          for d in artifacts/api/*; do
+            [ -d "$d" ] || continue
+            if [ -d "$d/allure-results-api" ]; then
+              cp -R "$d/allure-results-api/." allure-results-api/ 2>/dev/null || true
+            fi
+            if [ -d "$d/test-results" ]; then
+              cp -R "$d/test-results/." test-results/ 2>/dev/null || true
+            fi
+          done
+
+      - name: Download UI artifacts
+        if: always()
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ui-artifacts
+          path: artifacts/ui
+
+      - name: Collect UI results
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p allure-results-ui
+          if [ -d "artifacts/ui/allure-results-ui" ]; then
+            cp -R "artifacts/ui/allure-results-ui/." allure-results-ui/ 2>/dev/null || true
+          fi
 
       - name: Set up Java (for Allure report)
         if: always()
@@ -87,17 +252,16 @@ jobs:
         run: bun run allure:generate:merged
         continue-on-error: true
 
-      - name: Upload test results
+      - name: Upload merged test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: merged-artifacts
           path: |
-            test-results/
             allure-results-api/
             allure-results-ui/
             allure-results/
-            test-server.log
+            test-results/
           retention-days: 14
 
       - name: Upload Allure report
@@ -153,31 +317,48 @@ jobs:
                   ` (total ${counts.total})`
                 : `- **Summary**: (no results found in \`allure-results/\`)`;
 
-            const body = [
-              "## Test report",
+            const summaryBlock =
+              counts.total > 0
+                ? [
+                    "### Summary",
+                    "",
+                    "| Total | Passed | Failed | Skipped | Unknown |",
+                    "| ---: | ---: | ---: | ---: | ---: |",
+                    `| **${counts.total}** | **${counts.passed}** | **${counts.failed}** | **${counts.skipped}** | **${counts.unknown}** |`,
+                  ].join("\n")
+                : ["### Summary", "", "(no results found in `allure-results/`)"].join("\n");
+
+            const linksBlock = [
+              "### Links",
               "",
-              summaryLine,
-              `- **Run**: ${runUrl}`,
+              `- **Run page**: ${runUrl}`,
               artifactUrl
                 ? `- **Allure report artifact**: ${artifactUrl}`
                 : "- **Allure report artifact**: (not generated)",
+            ].join("\n");
+
+            const viewBlock = [
+              "### View the Allure report (downloaded artifact)",
               "",
-              "### View the Allure report (downloaded artifact, no repo needed)",
-              "Download + unzip the **allure-report** artifact, then serve it locally:",
+              "1) Download + unzip the **allure-report** artifact",
+              "2) Serve it locally:",
               "",
               "```bash",
               "cd allure-report",
               "python3 -m http.server 8000",
               "```",
               "",
-              "Open `http://localhost:8000`",
+              "3) Open `http://localhost:8000`",
+            ].join("\n");
+
+            const body = [
+              "## Test report",
               "",
-              "### Generate it locally (from this repo)",
-              "```bash",
-              "bun run allure:local",
-              "# or",
-              "bun run allure:serve",
-              "```",
+              summaryBlock,
+              "",
+              linksBlock,
+              "",
+              viewBlock,
             ].join("\n")
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -185,10 +366,3 @@ jobs:
               issue_number: context.payload.pull_request.number,
               body,
             })
-
-      - name: Stop test-server
-        if: always()
-        run: |
-          if [ -f test-server.pid ]; then
-            kill "$(cat test-server.pid)" || true
-          fi
