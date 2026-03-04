@@ -1,12 +1,13 @@
 import * as grpc from "@grpc/grpc-js";
 import type { ChannelCredentialsInput } from "@services/types";
-import { beginGrpcCall } from "@utils/testArtifacts";
+import { createRateLimiterFromEnv, type RateLimiter } from "@utils/rateLimiter";
 
-const toMs = (iso: string | undefined): number | undefined => {
-  if (!iso) return undefined;
-  const ms = Date.parse(iso);
-  return Number.isFinite(ms) ? ms : undefined;
-};
+import {
+  createDefaultGrpcClientOptions,
+  ensureMetadata,
+  streamCallWithLimiter,
+  unaryCallWithLimiter
+} from "@utils/grpcHandling";
 
 /**
  * Base class for "service objects" (Page Object Model style) around generated ts-proto clients.
@@ -16,6 +17,9 @@ const toMs = (iso: string | undefined): number | undefined => {
  * - Leaves concrete RPC methods to subclasses (no asserts here; tests own assertions)
  */
 export abstract class BaseGrpcService<TClient extends grpc.Client> {
+  private static readonly rateLimiter: RateLimiter = createRateLimiterFromEnv();
+
+  private readonly rateLimiter: RateLimiter | undefined;
   protected readonly client: TClient;
   protected readonly target: string;
 
@@ -27,9 +31,12 @@ export abstract class BaseGrpcService<TClient extends grpc.Client> {
     ) => TClient,
     target: string,
     creds: ChannelCredentialsInput,
-    options?: grpc.ClientOptions
+    options?: grpc.ClientOptions,
+    rateLimiter?: RateLimiter | null
   ) {
     this.target = target;
+    this.rateLimiter =
+      rateLimiter === null ? undefined : (rateLimiter ?? BaseGrpcService.rateLimiter);
     const resolvedCreds: grpc.ChannelCredentials = (() => {
       if (!creds) return grpc.credentials.createInsecure();
 
@@ -55,118 +62,27 @@ export abstract class BaseGrpcService<TClient extends grpc.Client> {
 
   // TODO: Need to check if we have this implemented in the service the keep alive ?
   protected defaultGrpcClientOptions(): grpc.ClientOptions {
-    return {
-      "grpc.keepalive_time_ms": 30_000,
-      "grpc.keepalive_timeout_ms": 10_000,
-      interceptors: [
-        (options, nextCall) => {
-          const method = options.method_definition.path;
-          const entry = beginGrpcCall({ target: this.target, method });
-
-          const requester: grpc.Requester = {
-            start: (metadata, listener, next) => {
-              if (entry) {
-                try {
-                  entry.requestMetadata = metadata.getMap() as Record<string, unknown>;
-                } catch {
-                  // ignore
-                }
-              }
-
-              const wrapped: grpc.Listener = {
-                onReceiveMessage: (message, nextMessage) => {
-                  if (entry) {
-                    const receivedAtIso = new Date().toISOString();
-                    entry.responses.push({ receivedAtIso, message });
-                    if (entry.timeToFirstResponseMs === undefined) {
-                      const sent = toMs(entry.requestSentAtIso) ?? toMs(entry.startedAtIso);
-                      const received = toMs(receivedAtIso);
-                      if (sent !== undefined && received !== undefined) {
-                        entry.timeToFirstResponseMs = Math.max(0, received - sent);
-                      }
-                    }
-                  }
-                  nextMessage(message);
-                },
-                onReceiveStatus: (status, nextStatus) => {
-                  if (entry) {
-                    entry.status = {
-                      code: status.code,
-                      details: status.details,
-                      metadata: (() => {
-                        try {
-                          return status.metadata.getMap();
-                        } catch {
-                          return undefined;
-                        }
-                      })()
-                    };
-                    entry.statusReceivedAtIso = new Date().toISOString();
-                    const sent = toMs(entry.requestSentAtIso) ?? toMs(entry.startedAtIso);
-                    const done = toMs(entry.statusReceivedAtIso);
-                    if (sent !== undefined && done !== undefined) {
-                      entry.durationMs = Math.max(0, done - sent);
-                    }
-                  }
-                  nextStatus(status);
-                }
-              };
-
-              next(metadata, wrapped);
-            },
-            sendMessage: (message, next) => {
-              if (entry && entry.request === undefined) {
-                entry.request = message;
-                entry.requestSentAtIso = new Date().toISOString();
-              }
-              next(message);
-            }
-          };
-
-          return new grpc.InterceptingCall(nextCall(options), requester);
-        }
-      ]
-    };
+    return createDefaultGrpcClientOptions(this.target);
   }
 
   // TODO: Need to check if we have this implemented in the service the metadata thing ?
   protected metadata(metadata?: grpc.Metadata): grpc.Metadata {
-    return metadata ?? new grpc.Metadata();
+    return ensureMetadata(metadata);
   }
 
-  protected unaryCall<TRes>(
+  protected async unaryCall<TRes>(
     invoke: (cb: (err: grpc.ServiceError | null, res?: TRes) => void) => void
   ): Promise<TRes> {
-    return new Promise<TRes>((resolve, reject) => {
-      invoke((err, res) => {
-        if (err) return reject(err);
-        if (!res) return reject(new Error("missing response"));
-        resolve(res);
-      });
-    });
+    return await unaryCallWithLimiter(this.rateLimiter, invoke);
   }
 
   /**
    * Collect server-streaming responses into an array.
    */
-  protected streamCall<TRes>(startStream: () => grpc.ClientReadableStream<TRes>): Promise<TRes[]> {
-    const responses: TRes[] = [];
-
-    return new Promise<TRes[]>((resolve, reject) => {
-      const stream = startStream();
-
-      stream.on("data", (chunk: TRes) => {
-        responses.push(chunk);
-      });
-
-      stream.on("end", () => {
-        resolve(responses);
-      });
-
-      stream.on("error", (err: Error) => {
-        reject(err);
-      });
-    });
+  protected async streamCall<TRes>(
+    startStream: () => grpc.ClientReadableStream<TRes>
+  ): Promise<TRes[]> {
+    return await streamCallWithLimiter(this.rateLimiter, startStream);
   }
 
   /**
