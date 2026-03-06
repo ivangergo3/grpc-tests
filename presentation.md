@@ -8,8 +8,8 @@ Use this file as a **scrollable presentation**.
 
 This repository is a **small test framework** for validating a gRPC system using:
 
-- **API tests** (Vitest) against an **external stub server** ( this can be easily changed for actual services )
-- **UI tests** (Playwright) that can also call the same gRPC APIs ( reusability )
+- **API tests** (Vitest) against an **external stub server** (can also be pointed at real services)
+- **UI tests** (Playwright) that can call the same gRPC APIs in the same test
 - **Allure reporting** with a **merged report** across API + UI runs
 
 The key idea: **tests stay simple** (Given / When / Then) while the framework owns:
@@ -25,21 +25,22 @@ The key idea: **tests stay simple** (Given / When / Then) while the framework ow
 
 - **Protos**: `proto/**`
 - **Generated code (committed)**: `src/gen/**`
-- **Service layer (ApiObjects)**: `src/services/**`
+- **API layer (ApiObjects / Service APIs)**: `src/services/**`
   - base: `src/services/base/**`
   - domains: `src/services/{user,payment,shipping}/**`
+- **UI layer (Page Objects)**: `src/pages/**`
 - **Utilities**: `src/utils/**`
   - `env.ts` (env parsing, dotenv)
   - `fixturesApi.ts` (API test surface: `api`, `build`, `verify`, `log`)
   - `fixturesUi.ts` (UI test surface: Playwright `test`, plus `api/build/verify/log/pages`)
-- **Test server (stub)**: `test-server/**` ( demoing purposes )
+- **Test server (stub)**: `test-server/**` *(demo purposes)*
 - **Tests**
   - API: `tests/api/**`
   - UI: `tests/ui/**`
 
 ---
 
-## 2.1) Main packages used (what they’re for)
+## 3) Main packages used (what they’re for)
 
 I usually show this right after the repo map, so people know what’s “ours” vs “third-party”.
 
@@ -64,7 +65,7 @@ I usually show this right after the repo map, so people know what’s “ours”
 
 ---
 
-## 2.2) Connections: insecure vs TLS / mTLS (supported, not demoed)
+## 4) Connections: insecure vs TLS / mTLS (supported, not demoed)
 
 In this demo repo we run a local stub server on `127.0.0.1:50051`, so the default setup is **insecure plaintext**.
 
@@ -80,48 +81,28 @@ Why it’s not shown in the demo:
 
 ---
 
-## 3) Architecture (big picture)
+## 5) Architecture (big picture)
 
 ```mermaid
-flowchart LR
-  subgraph Tests
-    A[Vitest API tests\n tests/api/*] -->|api fixture| Svc[Service APIs\nUser/Payment/Shipping]
-    U[Playwright UI tests\n tests/ui/*] -->|ui fixture| Pages[Page Objects\nsrc/pages/*]
-    U -->|api fixture reuse| Svc
-  end
+flowchart TB
+  %% Intentionally conceptual (no file paths).
 
-  subgraph Framework
-    Svc --> Base[BaseGrpcService\n(unary + streaming aggregation)]
-    Svc --> Build[Request builders\nbuild.*]
-    Svc --> Verify[Verifiers\nverify.*]
-    Base --> Artifacts[Artifacts + logging\nsrc/utils/testArtifacts.ts]
-  end
+  Tests["Tests<br/>(API + UI)"] --> Fixtures["Fixtures<br/>(shared setup)"]
+  Fixtures --> Objects["Object models<br/>ApiObjects + Page Objects"]
+  Objects --> External["External systems<br/>gRPC server + UI site"]
 
-  subgraph External
-    Server[test-server\n(standalone gRPC stub)] <-->|grpc-js| Base
-    Web[example.com] <-->|Playwright| Pages
-  end
-
-  Verify --> Allure[Allure results\napi + ui]
-  Allure --> Merge[merge + generate]
-  Merge --> Report[allure-report/]
+  Tests --> Allure["Allure results<br/>(API + UI)"]
+  Allure --> Report["Merged Allure report"]
 ```
-
-**Talking points**
-
-- Tests call **Service APIs** (not raw grpc-js clients, but service layer).
-- Streaming RPCs are **aggregated** into a single response to simplify assertions.
-- Both runners (Vitest + Playwright) produce Allure results → merged report.
-
 ---
 
-## 3.1) Reporting pipeline (Allure): how the report gets built
+## 6) Reporting pipeline (Allure): how the report gets built
 
 ```mermaid
 flowchart TB
   subgraph Runs["Test runs"]
-    A["bun run test:api:allure\n(Vitest + allure-vitest)"]
-    U["bun run test:ui:allure\n(Playwright + allure-playwright)"]
+    A["bun run test:api:allure<br/>(Vitest + allure-vitest)"]
+    U["bun run test:ui:allure<br/>(Playwright + allure-playwright)"]
   end
 
   subgraph Results["Allure results folders"]
@@ -150,7 +131,7 @@ flowchart TB
 
 ---
 
-## 3.2) Connectivity map (main): test cases → framework → external dependencies
+## 7) Connectivity map (main): test cases → framework → external dependencies
 
 ```mermaid
 flowchart TB
@@ -159,23 +140,20 @@ flowchart TB
     T_ui["UI test cases"]
   end
 
-  subgraph Fixtures
+  subgraph Framework["Framework"]
     F_api["fixturesApi.ts"]
     F_ui["fixturesUi.ts"]
-  end
-
-  subgraph Services["ApiObjects"]
-    S_user["user/*"]
-    S_pay["payment/*"]
-    S_ship["shipping/*"]
-    S_base["base/BaseGrpcService"]
-    S_types["types.ts"]
-    S_utils["utils folder"]
+    F_user["user/*"]
+    F_pay["payment/*"]
+    F_ship["shipping/*"]
+    F_base["base/BaseGrpcService"]
+    F_types["types.ts"]
+    F_utils["utils folder"]
   end
 
   subgraph ExternalDeps["External inputs"]
     subgraph Gen["Generated client/types (src/gen/**)"]
-      G["ts-proto output\nmessage types + grpc-js clients"]
+      G["ts-proto output<br/>message types + grpc-js clients"]
     end
 
     subgraph Transport["Transport package"]
@@ -185,24 +163,24 @@ flowchart TB
 
   T_api --> F_api
   T_ui --> F_ui
-  F_api --> S_user & S_pay & S_ship
-  F_ui --> S_user & S_pay & S_ship
-  S_user --> S_base
-  S_pay --> S_base
-  S_ship --> S_base
-  S_base --> S_types
-  S_user --> G
-  S_pay --> G
-  S_ship --> G
+  F_api --> F_user & F_pay & F_ship
+  F_ui --> F_user & F_pay & F_ship
+  F_user --> F_base
+  F_pay --> F_base
+  F_ship --> F_base
+  F_base --> F_types
+  F_user --> G
+  F_pay --> G
+  F_ship --> G
   G --> GRPC
-  S_base --> S_utils
+  F_base --> F_utils
 ```
 
 ---
 
 
 
-## 4) The “test style” goal
+## 8) The “test style” goal
 
 We aim for a consistent 3-part structure:
 
@@ -229,24 +207,33 @@ Why this matters:
 
 ---
 
-## 5) Why “service wrappers”?
+## 9) Why ApiObjects + Page Objects?
 
-Instead of writing gRPC calls directly in tests:
+Instead of writing raw gRPC calls or raw UI selectors directly in tests:
 
-- We wrap generated clients in typed **ApiObjects**
-- Each wrapper has:
-  - `<rpc>(req)` (typed request)
-  - `<rpc>WithParams(params)` (request-builder path)
+- We wrap generated gRPC clients in typed **ApiObjects** (`src/services/**`)
+- We wrap UI flows in **Page Objects** (`src/pages/**`)
+
+Both follow the same idea: tests should read like a spec and hide low-level details.
+
+ApiObjects typically expose:
+
+- `<rpc>(req)` (typed request)
+- `<rpc>WithParams(params)` (request-builder path)
+
+Page Objects typically expose:
+
+- `goto(...)`, `expectLoaded()`, and higher-level user actions for the domain UI
 
 This gives:
 
 - fewer imports in tests
-- consistent metadata handling
-- consistent error handling and reporting hooks
+- consistent patterns across API + UI tests
+- more useful logs and debugging artifacts when things fail
 
 ---
 
-## 6) Streaming: why we aggregate
+## 10) Streaming: why we aggregate
 
 Server-streaming responses are collected and turned into a **single aggregated response**.
 
@@ -257,7 +244,7 @@ Server-streaming responses are collected and turned into a **single aggregated r
 
 ---
 
-## 7) Failures: promise rejection is the “response”
+## 11) Failures: promise rejection is the “response”
 
 gRPC “failures” are **rejected promises** (ServiceError), not response objects.
 
@@ -272,7 +259,7 @@ This:
 
 ---
 
-## 8) Fixtures: the “single import” experience
+## 12) Fixtures: the “single import” experience
 
 ### API fixture (`src/utils/fixturesApi.ts`)
 
@@ -293,11 +280,11 @@ Exports:
 
 **Important detail**
 
-- UI `api` clients are now **closed after each test** (prevents leaked sockets in CI). If we will see hot things are working with a real application, maybe we can change this.
+- UI `api` clients are **closed after each test** (prevents leaked sockets/handles in CI). If this becomes too slow for a real app, we can optimize it.
 
 ---
 
-## 9) Allure strategy: API + UI merge
+## 13) Allure strategy: API + UI merge
 
 We write separate result folders:
 
@@ -316,7 +303,7 @@ This supports:
 
 ---
 
-## 10) Commands (local)
+## 14) Commands (local)
 
 ### Start stub server (terminal A)
 
@@ -348,7 +335,7 @@ bun run test:ui:install
 
 ---
 
-## 11) Allure (local)
+## 15) Allure (local)
 
 One-command “do everything”:
 
@@ -368,73 +355,65 @@ bun run allure:serve
 
 ---
 
-## 12) CI overview (what happens on PR)
+## 16) CI overview (what happens on PR)
 
-In `.github/workflows/test.yml` the job:
+In `.github/workflows/test.yml` we run **API + UI in parallel**, then build **one merged Allure report**.
 
-- installs dependencies **(cached)**
-- installs Playwright (Chromium) **(cached)**
-- starts `test-server` **(as a demo)**
-- runs API tests (Allure) + UI tests (Allure)
-- generates merged Allure report
-- uploads artifacts
-- posts a PR comment with:
-  - run link
-  - counts (passed/failed/skipped)
-  - artifact link + how to serve it locally
+### What the pipeline does
 
----
+- **Discover API test files** dynamically (`tests/api/*.test.ts`)
+- **Run API tests** as a matrix (one file per job, parallel) and upload:
+  - `allure-results-api/**`
+  - `test-results/**` (JUnit)
+- **Run UI tests** in parallel and upload:
+  - `allure-results-ui/**`
+- **Report job** downloads API shards + UI results, then:
+  - merges results → `allure-results/**`
+  - generates HTML → `allure-report/**`
+  - uploads the report artifact
+  - posts a PR comment with:
+    - a summary table (passed/failed/skipped)
+    - links (run page + report artifact)
+    - “how to view” instructions
 
-## 13) Live demo (3 minutes)
+Show:
 
-1) Start server:
-
-```bash
-bun run test-server
-```
-
-2) Run a small subset:
-
-```bash
-bun run test:api -- tests/api/shipping-service.test.ts
-bun run test:ui -- tests/ui/ui-and-grpc.test.ts
-```
-
-3) Generate merged report:
-
-```bash
-bun run allure:local
-```
-
-4) Open:
-
-```bash
-bun run allure:open
-```
+- the **Actions run page** (you can visibly see API shards + UI running in parallel)
+- the **PR comment** (summary table + report artifact link)
 
 ---
 
-## 14) Design decisions (quick Q&A bullets)
+## 17) Demo screenshot: Allure report (web-only)
+
+- **Top-level summary** (passed / failed / skipped)
+- Open one **failing test** and show the attachments:
+  - global logs
+  - gRPC request, streamed responses, final status/metadata, timing
+
+![Allure report screenshot](./report.png)
+
+---
+
+## 18) Design decisions (quick Q&A bullets)
 
 - **Why commit `src/gen/**`?**
   - repeatable builds, less local toolchain pain, easier onboarding
-  - is this one of the suggested ways by gRPC to handle protos
+  - this matches common gRPC workflows where code is generated and committed
 - **Why external `test-server/`?**
   - test framework stays pure; server process is explicit and debuggable
-  - this is por testing purposes, with a deployed service we have a better solution
+  - for testing/demo purposes; in a real setup you’d point at a deployed environment
 - **Why no `expect` imports in verifiers?**
   - avoids cross-runner collisions; Vitest uses globals, UI uses injected expect
-  - meaning, when we run API tests we use Vitest runner and verifier, when we run UI tests, we use Playwright
-  - this might cause some problems later, we will need to test it with a real service
+  - meaning: API tests run under Vitest, UI tests run under Playwright, but verifiers can still be shared
 - **Why merge Allure results?**
   - single view of “end-to-end”: UI + API in one report
   - usability
 
 ---
 
-## 15) Roadmap ideas (optional)
+## 19) Roadmap ideas (optional)
 
-- use this as a skeleton for the real framework
+- use this as a skeleton for a real framework
 - add one service at a time with API test
 - introduce UI tests later
 - gradual rolling out
