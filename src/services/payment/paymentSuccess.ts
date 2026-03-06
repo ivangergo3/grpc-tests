@@ -10,6 +10,7 @@ import type {
   WatchPaymentResponse
 } from "@services/types";
 import { asResponses, verifySuccessContext } from "@services/base";
+import { expect } from "@playwright/test";
 
 export const verifyAuthorizeSuccess = (
   res: SuccessOneOrMany<AuthorizePaymentResponse>,

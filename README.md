@@ -1,4 +1,4 @@
-## gRPC test framework (Bun + TypeScript + Vitest)
+## gRPC test framework (Bun + TypeScript + Playwright)
 
 This repo is a small **gRPC testing framework** + an **external stub server** you can run locally or in CI to validate:
 
@@ -15,11 +15,10 @@ This repo is a small **gRPC testing framework** + an **external stub server** yo
   - Base: `src/services/base/` (`BaseGrpcService`, verifiers, helpers)
   - Domains: `src/services/{user,payment,shipping}/`
 - **Tests**:
-  - API (Vitest): `tests/api/**`
+  - API (Playwright): `tests/api/**`
   - UI (Playwright): `tests/ui/**`
 - **Test fixtures**:
-  - API fixture: `src/utils/fixturesApi.ts` (exports `api`, `log`, `build`, `verify`, etc.)
-  - UI fixture: `src/utils/fixturesUi.ts` (exports Playwright `test`, `expect` + `build`, `verify`, etc.)
+  - Shared Playwright fixtures: `src/utils/fixtures.ts` (exports Playwright `test`, `expect`, plus `api`, `log`, `build`, `verify`, `exampleDomainPage`)
 - **External local stub server**: `test-server/` (run separately)
 
 ---
@@ -45,17 +44,16 @@ Copy `.env.example` → `.env` and adjust values as needed.
 Minimum required for local API runs:
 
 - `TEST_SERVER_BASE_URL`
-- `TEST_TIMEOUT`, `HOOK_TIMEOUT`, `RUN_TIMEOUT`
-- `VITEST_RETRY`
-- `EXPECT_POLL_TIMEOUT`, `EXPECT_POLL_INTERVAL`
 - `JUNIT_OUTPUT_FILE`
+- `ALLURE_RESULTS_DIR`
+- `RUN_TIMEOUT`
 
 Minimum required for local UI runs:
 
 - `PLAYWRIGHT_BASE_URL`
 - `PLAYWRIGHT_TEST_TIMEOUT`, `PLAYWRIGHT_EXPECT_TIMEOUT`, `PLAYWRIGHT_ACTION_TIMEOUT`
 - `PLAYWRIGHT_RETRIES`
-- `ALLURE_RESULTS_DIR_UI`
+- `ALLURE_RESULTS_DIR` (set to `allure-results-ui` for UI runs)
 
 ### 3) Start the local stub server
 
@@ -86,6 +84,8 @@ Notes:
 ---
 
 ## Allure reporting (local)
+
+Note: generating/serving the Allure HTML report requires **Java** (JRE/JDK).
 
 We keep **separate results folders** so API/UI can run independently (or in parallel in CI):
 
@@ -196,7 +196,7 @@ gRPC failures are **rejections** (errors), not response messages. The framework 
 
 ### Single worker execution
 
-Vitest is configured to run **one worker at a time** (no in-run parallelism). Parallelism is intended to be handled at the CI level instead.
+This framework is intended to run with **limited in-run parallelism**. Parallelism is intended to be handled at the CI level instead (e.g. sharding API tests per file).
 
 ---
 

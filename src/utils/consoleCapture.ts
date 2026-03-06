@@ -1,7 +1,6 @@
-import { afterEach, beforeEach } from "vitest";
 import { logger } from "@utils/logger";
-import { attachArtifactsToAllure, getTestArtifacts, recordLog, startTestArtifacts } from "@utils/testArtifacts";
-import { requireNonNegativeInt } from "@utils/env";
+import { parseNonNegativeInt } from "@utils/env";
+import { recordLog } from "@utils/testArtifacts";
 
 const log = logger;
 
@@ -12,14 +11,18 @@ const toError = (reason: unknown): Error => {
 
 // Extra safety net: fail hard on anything that slips past awaits/assertions.
 const p = process as typeof process & {
-  __vitestGlobalHandlersInstalled?: boolean;
+  __frameworkGlobalHandlersInstalled?: boolean;
   __frameworkConsolePatched?: boolean;
-  __frameworkConsoleOriginals?: Partial<Record<"log" | "info" | "warn" | "error" | "debug", (...args: unknown[]) => void>>;
+  __frameworkConsoleOriginals?: Partial<
+    Record<"log" | "info" | "warn" | "error" | "debug", (...args: unknown[]) => void>
+  >;
 };
-if (!p.__vitestGlobalHandlersInstalled) {
-  p.__vitestGlobalHandlersInstalled = true;
 
-  const runTimeoutMs = requireNonNegativeInt("RUN_TIMEOUT");
+export const installGlobalHandlersOnce = (): void => {
+  if (p.__frameworkGlobalHandlersInstalled) return;
+  p.__frameworkGlobalHandlersInstalled = true;
+
+  const runTimeoutMs = parseNonNegativeInt(process.env.RUN_TIMEOUT) ?? 0;
   if (runTimeoutMs > 0) {
     const timeout = setTimeout(() => {
       const err = new Error(`Test run exceeded runTimeoutMs=${runTimeoutMs}ms`);
@@ -46,7 +49,7 @@ if (!p.__vitestGlobalHandlersInstalled) {
     process.exitCode = 1;
     throw err;
   });
-}
+};
 
 const safeToString = (v: unknown): string => {
   if (typeof v === "string") return v;
@@ -76,7 +79,7 @@ const parseLoggerPrefix = (
   return undefined;
 };
 
-const patchConsoleOnce = (): void => {
+export const patchConsoleOnce = (): void => {
   if (p.__frameworkConsolePatched) return;
   p.__frameworkConsolePatched = true;
 
@@ -85,7 +88,7 @@ const patchConsoleOnce = (): void => {
     info: console.info.bind(console),
     warn: console.warn.bind(console),
     error: console.error.bind(console),
-    debug: console.debug.bind(console),
+    debug: console.debug.bind(console)
   };
 
   const wrap =
@@ -98,18 +101,15 @@ const patchConsoleOnce = (): void => {
         recordLog({
           ts: parsed.ts,
           level: parsed.level,
-          message: [
-            parsed.scope ? `[${parsed.scope}]` : undefined,
-            ...rest.map((a) => (typeof a === "string" ? a : safeToString(a))),
-          ]
+          message: [parsed.scope ? `[${parsed.scope}]` : undefined, ...rest.map((a) => safeToString(a))]
             .filter((x): x is string => typeof x === "string" && x.trim() !== "")
-            .join(" "),
+            .join(" ")
         });
       } else {
         recordLog({
           ts: new Date().toISOString(),
           level,
-          message: args.map((a) => (typeof a === "string" ? a : safeToString(a))).join(" "),
+          message: args.map((a) => safeToString(a)).join(" ")
         });
       }
 
@@ -122,18 +122,4 @@ const patchConsoleOnce = (): void => {
   console.error = wrap("error", "error");
   console.debug = wrap("debug", "debug");
 };
-
-patchConsoleOnce();
-
-beforeEach(({ task }) => {
-  // Capture allure API (set by allure-vitest/setup) if present.
-  const allure = (globalThis as unknown as { allure?: unknown }).allure;
-  startTestArtifacts(task.name, allure);
-});
-
-afterEach(() => {
-  const ctx = getTestArtifacts();
-  if (!ctx) return;
-  attachArtifactsToAllure(ctx);
-});
 

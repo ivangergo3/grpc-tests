@@ -1,10 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { test, expect } from "@utils/fixtures";
 import { PaymentStatus } from "@gen/acme/payment/v1/payment_service";
 import { status } from "@grpc/grpc-js";
-import { api, verify } from "@utils/fixturesApi";
 
-describe("PaymentService", () => {
-  it("Authorize returns AUTHORIZED status", async () => {
+test.describe("PaymentService", () => {
+  test("Authorize returns AUTHORIZED status", async ({ api, verify }) => {
     // given
     const params = {
       context: { requestId: "pay-1" },
@@ -18,7 +17,7 @@ describe("PaymentService", () => {
     verify.payment.authorizeSuccess(res, { expectedRequestId: "pay-1", expectedPaymentId: "p-1" });
   });
 
-  it("Capture returns CAPTURED status", async () => {
+  test("Capture returns CAPTURED status", async ({ api, verify }) => {
     // given
     const params = {
       paymentId: "p-1",
@@ -32,7 +31,7 @@ describe("PaymentService", () => {
     verify.payment.captureSuccess(res, { expectedRequestId: "pay-2", expectedPaymentId: "p-1" });
   });
 
-  it("Authorize echoes payment id", async () => {
+  test("Authorize echoes payment id", async ({ api, verify }) => {
     // given
     const params = {
       paymentId: "p-xyz",
@@ -49,7 +48,7 @@ describe("PaymentService", () => {
     });
   });
 
-  it("Authorize returns metadata + echoed context", async () => {
+  test("Authorize returns metadata + echoed context", async ({ api, verify }) => {
     // given
     const params = {
       paymentId: "p-meta",
@@ -66,7 +65,7 @@ describe("PaymentService", () => {
     });
   });
 
-  it("WatchPayment returns a stream aggregated into events[]", async () => {
+  test("WatchPayment returns a stream aggregated into events[]", async ({ api, verify }) => {
     // given
     const params = {
       paymentId: "p-stream-1",
@@ -89,7 +88,7 @@ describe("PaymentService", () => {
     });
   });
 
-  it("WatchPayment can resume with afterEventIndex", async () => {
+  test("WatchPayment can resume with afterEventIndex", async ({ api, verify }) => {
     // given
     const params = {
       paymentId: "p-stream-2",
@@ -110,7 +109,7 @@ describe("PaymentService", () => {
     });
   });
 
-  it("Authorize returns INVALID_ARGUMENT for fail-* ids", async () => {
+  test("Authorize returns INVALID_ARGUMENT for fail-* ids", async ({ api, verify }) => {
     // given
     const params = {
       paymentId: "fail-pay-1",
@@ -128,7 +127,7 @@ describe("PaymentService", () => {
     );
   });
 
-  it("WatchPayment returns INVALID_ARGUMENT for fail-* ids", async () => {
+  test("WatchPayment returns INVALID_ARGUMENT for fail-* ids", async ({ api, verify }) => {
     // given
     const params = {
       paymentId: "fail-pay-stream",

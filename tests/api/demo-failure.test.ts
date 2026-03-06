@@ -1,9 +1,7 @@
-import { describe, it } from "vitest";
+import { test } from "@utils/fixtures";
 
-import { api, log, verify } from "@utils/fixturesApi";
-
-describe("Demo tests (report/logging examples)", () => {
-  it.skip("skipped demo test", () => {
+test.describe("Demo tests (report/logging examples)", () => {
+  test.skip("skipped demo test", () => {
     // No-op; this is just to have one SKIPPED test in reports.
   });
 });
@@ -11,8 +9,8 @@ describe("Demo tests (report/logging examples)", () => {
 /**
  * This is intentionally failing so you can see logs and assertion output.
  */
-describe("Demo failing tests (intentionally red)", () => {
-  it("fails after a real gRPC call", async () => {
+test.describe("Demo failing tests (intentionally red)", () => {
+  test("fails after a real gRPC call", async ({ api, log, verify }) => {
     log.info("demo failing test starting");
     const res = await api.payment.authorizeWithParams({
       paymentId: "demo-pay-1",

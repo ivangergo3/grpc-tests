@@ -1,9 +1,10 @@
 import type { ServiceError } from "@grpc/grpc-js";
 import type { FailureOptions, FailurePromiseContext, FailureSnapshot } from "@services/types";
+import { expect } from "@playwright/test";
 
 /**
  * Base failure verification: common checks for failed gRPC calls (thrown errors).
- * Use in test context (expect from Vitest is global).
+ * Use in test context (Playwright expect).
  */
 
 /**

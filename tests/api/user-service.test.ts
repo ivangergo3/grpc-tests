@@ -1,9 +1,8 @@
-import { describe, it } from "vitest";
-import { api, verify } from "@utils/fixturesApi";
+import { test } from "@utils/fixtures";
 import { status } from "@grpc/grpc-js";
 
-describe("UserService", () => {
-  it("responds to GetUser", async () => {
+test.describe("UserService", () => {
+  test("responds to GetUser", async ({ api, verify }) => {
     // given
     const params = {
       userId: "123",
@@ -19,7 +18,7 @@ describe("UserService", () => {
     verify.user.getUserSuccess(res, { expectedUserId: "123", expectedRequestId: "req-1" });
   });
 
-  it("responds to SearchUsers", async () => {
+  test("responds to SearchUsers", async ({ api, verify }) => {
     // given
     const params = {
       query: "jane",
@@ -33,7 +32,7 @@ describe("UserService", () => {
     verify.user.searchUsersSuccess(res, { expectedRequestId: "req-1b" });
   });
 
-  it("SearchUsers can return inactive users when activeOnly=false", async () => {
+  test("SearchUsers can return inactive users when activeOnly=false", async ({ api, verify }) => {
     // given
     const params = {
       activeOnly: false,
@@ -52,7 +51,7 @@ describe("UserService", () => {
     });
   });
 
-  it("SearchUsersStream aggregates users into a SearchUsersResponse", async () => {
+  test("SearchUsersStream aggregates users into a SearchUsersResponse", async ({ api, verify }) => {
     // given
     const params = {
       query: "jane",
@@ -66,7 +65,7 @@ describe("UserService", () => {
     verify.user.searchUsersStreamSuccess(res, { expectedRequestId: "req-stream-1" });
   });
 
-  it("GetUser returns INVALID_ARGUMENT for fail-* ids", async () => {
+  test("GetUser returns INVALID_ARGUMENT for fail-* ids", async ({ api, verify }) => {
     // given
     const params = {
       userId: "fail-user",
@@ -84,7 +83,7 @@ describe("UserService", () => {
     );
   });
 
-  it("SearchUsers returns INVALID_ARGUMENT for fail-* query", async () => {
+  test("SearchUsers returns INVALID_ARGUMENT for fail-* query", async ({ api, verify }) => {
     // given
     const params = {
       query: "fail-query",
@@ -102,7 +101,7 @@ describe("UserService", () => {
     );
   });
 
-  it("SearchUsersStream returns INVALID_ARGUMENT for fail-* query", async () => {
+  test("SearchUsersStream returns INVALID_ARGUMENT for fail-* query", async ({ api, verify }) => {
     // given
     const params = {
       query: "fail-stream",

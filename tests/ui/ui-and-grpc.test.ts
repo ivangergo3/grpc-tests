@@ -1,6 +1,6 @@
-import { test } from "@utils/fixturesUi";
+import { test } from "@utils/fixtures";
 
-test("opens example.com and calls GetUser", async ({ api, pages, log, verify }) => {
+test("opens example.com and calls GetUser", async ({ api, exampleDomainPage, log, verify }) => {
   // given
   const requestId = `ui-${Date.now()}`;
   const params = {
@@ -12,10 +12,10 @@ test("opens example.com and calls GetUser", async ({ api, pages, log, verify }) 
 
   // when
   log.info("ui test calling GetUser", { requestId });
-  await pages.exampleDomain.goto("/");
+  await exampleDomainPage.goto("/");
   const res = await api.user.getUserWithParams(params);
 
   // then
-  await pages.exampleDomain.expectLoaded();
+  await exampleDomainPage.expectLoaded();
   verify.user.getUserSuccess(res, { expectedRequestId: requestId });
 });

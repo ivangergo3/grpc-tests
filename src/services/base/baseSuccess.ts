@@ -3,6 +3,7 @@ import type {
   SuccessContextOptions,
   VerifyStreamSuccessOptions
 } from "@services/types";
+import { expect } from "@playwright/test";
 
 /**
  * Normalizes one or many responses to an array so the same verifier works for
@@ -41,11 +42,12 @@ export const verifyStreamSuccess = <T>(
   if (value.events.length === 0) {
     expect(value.lastEvent).toBeUndefined();
   } else {
-    expect(value.lastEvent).toEqual(value.events[value.events.length - 1]);
+    // Cast to avoid Playwright's Locator-specialized expect overload in generic code.
+    expect(value.lastEvent as unknown).toEqual(value.events[value.events.length - 1]);
   }
 
   if (options?.expectedLastEvent !== undefined) {
-    expect(value.lastEvent).toEqual(options.expectedLastEvent);
+    expect(value.lastEvent as unknown).toEqual(options.expectedLastEvent);
   }
   if (options?.expectedEvents !== undefined) {
     expect(value.events).toEqual(options.expectedEvents);

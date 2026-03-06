@@ -6,6 +6,7 @@ import type {
   VerifySearchUsersSuccessOptions
 } from "@services/types";
 import { asResponses, verifySuccessContext } from "@services/base";
+import { expect } from "@playwright/test";
 
 export const verifyGetUserSuccess = (
   res: SuccessOneOrMany<GetUserResponse>,

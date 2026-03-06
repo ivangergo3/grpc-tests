@@ -1,9 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { api, verify } from "@utils/fixturesApi";
+import { test, expect } from "@utils/fixtures";
 import { status } from "@grpc/grpc-js";
 
-describe("ShippingService", () => {
-  it("CreateShipment returns shipment", async () => {
+test.describe("ShippingService", () => {
+  test("CreateShipment returns shipment", async ({ api, verify }) => {
     // given
     const params = {
       shipmentId: "sh-1",
@@ -21,7 +20,7 @@ describe("ShippingService", () => {
     });
   });
 
-  it("TrackShipment returns events", async () => {
+  test("TrackShipment returns events", async ({ api, verify }) => {
     // given
     const params = {
       shipmentId: "sh-1",
@@ -38,7 +37,7 @@ describe("ShippingService", () => {
     });
   });
 
-  it("TrackShipment echoes shipment id", async () => {
+  test("TrackShipment echoes shipment id", async ({ api, verify }) => {
     // given
     const params = {
       shipmentId: "sh-xyz",
@@ -56,7 +55,7 @@ describe("ShippingService", () => {
     });
   });
 
-  it("TrackShipment echoes request context", async () => {
+  test("TrackShipment echoes request context", async ({ api, verify }) => {
     // given
     const params = {
       shipmentId: "sh-ctx",
@@ -73,7 +72,7 @@ describe("ShippingService", () => {
     });
   });
 
-  it("WatchShipment returns a stream aggregated into events[]", async () => {
+  test("WatchShipment returns a stream aggregated into events[]", async ({ api, verify }) => {
     // given
     const params = {
       shipmentId: "sh-stream-1",
@@ -93,7 +92,7 @@ describe("ShippingService", () => {
     });
   });
 
-  it("WatchShipment can resume with afterEventIndex", async () => {
+  test("WatchShipment can resume with afterEventIndex", async ({ api, verify }) => {
     // given
     const params = {
       shipmentId: "sh-stream-2",
@@ -114,7 +113,7 @@ describe("ShippingService", () => {
     });
   });
 
-  it("CreateShipment returns INVALID_ARGUMENT for fail-* ids", async () => {
+  test("CreateShipment returns INVALID_ARGUMENT for fail-* ids", async ({ api, verify }) => {
     // given
     const params = {
       shipmentId: "fail-ship-1",
@@ -133,7 +132,7 @@ describe("ShippingService", () => {
     );
   });
 
-  it("TrackShipment returns INVALID_ARGUMENT for fail-* ids", async () => {
+  test("TrackShipment returns INVALID_ARGUMENT for fail-* ids", async ({ api, verify }) => {
     // given
     const params = {
       shipmentId: "fail-ship-2",
@@ -151,7 +150,7 @@ describe("ShippingService", () => {
     );
   });
 
-  it("WatchShipment returns INVALID_ARGUMENT for fail-* ids", async () => {
+  test("WatchShipment returns INVALID_ARGUMENT for fail-* ids", async ({ api, verify }) => {
     // given
     const params = {
       shipmentId: "fail-ship-stream",

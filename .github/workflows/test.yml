@@ -63,16 +63,19 @@ jobs:
       - name: Clean previous reports
         run: bun run allure:clean
 
+      - name: Prepare report directories
+        run: mkdir -p test-results
+
       - name: Run API tests (Allure)
         run: bun run test:api:allure -- "${{ matrix.file }}" || true
         env:
           TEST_SERVER_BASE_URL: 127.0.0.1:50051
-          TEST_TIMEOUT: "30000"
-          HOOK_TIMEOUT: "30000"
           RUN_TIMEOUT: "0"
-          VITEST_RETRY: "0"
-          EXPECT_POLL_TIMEOUT: "5000"
-          EXPECT_POLL_INTERVAL: "50"
+          PLAYWRIGHT_BASE_URL: https://example.com
+          PLAYWRIGHT_TEST_TIMEOUT: "30000"
+          PLAYWRIGHT_EXPECT_TIMEOUT: "5000"
+          PLAYWRIGHT_ACTION_TIMEOUT: "30000"
+          PLAYWRIGHT_RETRIES: "0"
           JUNIT_OUTPUT_FILE: test-results/junit-${{ matrix.id }}.xml
           LOG_LEVEL: info
 
@@ -136,6 +139,9 @@ jobs:
       - name: Clean previous reports
         run: bun run allure:clean
 
+      - name: Prepare report directories
+        run: mkdir -p test-results
+
       - name: Run UI tests (Allure)
         run: bun run test:ui:allure -- --workers="${PLAYWRIGHT_WORKERS}" || true
         env:
@@ -146,6 +152,7 @@ jobs:
           PLAYWRIGHT_ACTION_TIMEOUT: "10000"
           PLAYWRIGHT_RETRIES: "0"
           PLAYWRIGHT_WORKERS: "1"
+          JUNIT_OUTPUT_FILE: test-results/junit-ui.xml
           LOG_LEVEL: info
 
       - name: Upload UI artifacts

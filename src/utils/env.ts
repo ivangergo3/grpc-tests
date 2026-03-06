@@ -33,7 +33,7 @@ const parseLine = (line: string): [key: string, value: string] | undefined => {
   let value = trimmed.slice(eq + 1).trim();
 
   if (
-    (value.startsWith("\"") && value.endsWith("\"")) ||
+    (value.startsWith('"') && value.endsWith('"')) ||
     (value.startsWith("'") && value.endsWith("'"))
   ) {
     value = value.slice(1, -1);
@@ -43,7 +43,7 @@ const parseLine = (line: string): [key: string, value: string] | undefined => {
 };
 
 /**
- * Minimal `.env` loader so Vitest/Vite config and runtime code
+ * Minimal `.env` loader so config and runtime code
  * see the same required env vars (without adding a dotenv dependency).
  *
  * Only sets keys that are currently undefined in process.env.
@@ -61,4 +61,3 @@ export const loadDotEnvOnce = (file = path.resolve(process.cwd(), ".env")): void
     if (process.env[key] === undefined) process.env[key] = value;
   }
 };
-
